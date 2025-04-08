@@ -11,13 +11,11 @@ import DriverPublicProfile from "./pages/DriverPublicProfile";
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const driver = localStorage.getItem("driver");
     setIsAuthenticated(!!driver);
   }, []);
-  if (loading) return <div className="text-center mt-10 text-white">Loading...</div>;
 
 
   return (
