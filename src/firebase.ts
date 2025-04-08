@@ -1,11 +1,18 @@
-// src/firebase.ts
-
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { getDatabase } from "firebase/database";
 import { getAnalytics, isSupported } from "firebase/analytics";
+
+// ✅ Debug: Log environment variable (REMOVE after verifying)
+console.log("🔥 FIREBASE API KEY:", import.meta.env.VITE_FIREBASE_API_KEY);
+
+// ✅ Safety check for missing env vars
+if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+  console.error("❌ Missing Firebase environment variables. Check your Vercel settings.");
+  throw new Error("❌ Missing Firebase environment variables.");
+}
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,7 +25,7 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 // Core services
@@ -27,7 +34,7 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
 
-// Optional: Analytics (guarded for environments like SSR or unsupported browsers)
+// Optional: Analytics (guarded for unsupported environments)
 let analytics: ReturnType<typeof getAnalytics> | null = null;
 isSupported().then((supported) => {
   if (supported) {
