@@ -4,13 +4,8 @@
   "private": true,
   "dependencies": {
     "@headlessui/react": "^2.2.1",
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
     "@turf/helpers": "^7.2.0",
     "@turf/turf": "^7.2.0",
-    "@types/jest": "^27.5.2",
     "axios": "^1.8.4",
     "chart.js": "^4.4.8",
     "clsx": "^2.1.1",
@@ -26,9 +21,7 @@
     "react-icons": "^5.5.0",
     "react-qr-code": "^2.0.15",
     "react-router-dom": "^7.5.0",
-    "react-scripts": "5.0.1",
-    "recharts": "^2.15.2",
-    "web-vitals": "^2.1.4"
+    "recharts": "^2.15.2"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -66,6 +59,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.3.5",
-    "typescript": "^4.9.5"
+    "typescript": "^4.9.5",
+    "vite": "^6.2.5"
   }
 }
