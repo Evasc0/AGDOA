@@ -34,7 +34,7 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
 
-// Optional: Analytics (guarded for unsupported environments)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let analytics: ReturnType<typeof getAnalytics> | null = null;
 isSupported().then((supported) => {
   if (supported) {
