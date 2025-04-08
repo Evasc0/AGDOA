@@ -1,3 +1,4 @@
+//firebase.ts
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -42,4 +43,4 @@ isSupported().then((supported) => {
   }
 });
 
-export { app, db, auth, storage, rtdb };
+export { app, db, auth, storage, rtdb, analytics };

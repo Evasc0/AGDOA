@@ -1,5 +1,4 @@
-// src/pages/Analytics.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../components/AuthContext';
@@ -49,7 +48,7 @@ const Analytics: React.FC = () => {
     { date: string; earnings: number; rides: number }[]
   >([]);
 
-  const fetchWeather = async () => {
+  const fetchWeather = useCallback(async () => {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords;
       try {
@@ -83,9 +82,9 @@ const Analytics: React.FC = () => {
         console.error('Weather fetch error:', err);
       }
     });
-  };
+  }, [alertMsg]);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     if (!user) return;
     setRefreshing(true);
     try {
@@ -95,7 +94,7 @@ const Analytics: React.FC = () => {
       const q = query(
         collection(db, 'ride_logs'),
         where('driverId', '==', user.uid),
-        where('timestamp', '>=', Timestamp.fromDate(new Date(today.getTime() - 6 * 86400000)))
+        where('timestamp', '>=', Timestamp.fromDate(new Date(today.getTime() - 6 * 86400000))) // past 7 days
       );
 
       const snapshot = await getDocs(q);
@@ -150,14 +149,14 @@ const Analytics: React.FC = () => {
       console.error('Error loading analytics:', err);
     }
     setRefreshing(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     if (user) {
       fetchWeather();
       fetchAnalytics();
     }
-  }, [user]);
+  }, [user, fetchWeather, fetchAnalytics]);
 
   return (
     <div className="p-4 text-white">
@@ -165,7 +164,6 @@ const Analytics: React.FC = () => {
 
       {alertMsg && <div className="bg-yellow-600 p-3 rounded-lg mb-4">{alertMsg}</div>}
 
-      {/* Weather Forecast */}
       {forecast.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 mb-6">
           {forecast.map((day, i) => (
@@ -179,7 +177,6 @@ const Analytics: React.FC = () => {
         </div>
       )}
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gray-800 p-4 rounded-lg">🕒 Avg Wait Time: {avgWaitTime} mins</div>
         <div className="bg-gray-800 p-4 rounded-lg">🚖 Rides Today: {ridesToday}</div>
@@ -213,9 +210,8 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Chart */}
       <div className="bg-gray-900 p-4 rounded-xl mt-6">
-        <h2 className="text-lg font-semibold mb-2">📈 7-Day Ride & Earnings Trend</h2>
+        📈 <h2 className="text-lg font-semibold mb-2">7-Day Ride & Earnings Trend</h2>
         <div className="overflow-x-auto">
           <div className="min-w-[320px] sm:min-w-full">
             <Bar
