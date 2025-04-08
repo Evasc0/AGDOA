@@ -152,8 +152,10 @@ const Analytics: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchWeather();
-    fetchAnalytics();
+    if (user) {
+      fetchWeather();
+      fetchAnalytics();
+    }
   }, [user]);
 
   return (

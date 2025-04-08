@@ -41,6 +41,52 @@ const RideHistoryFilterModal: React.FC<Props> = ({
         <h2 className="text-xl font-bold mb-4">Filter Rides</h2>
 
         <div className="space-y-4">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                setStartDate(todayStart);
+                setEndDate(now);
+              }}
+            >
+              Today
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const sevenDaysAgo = new Date(now);
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                setStartDate(sevenDaysAgo);
+                setEndDate(now);
+              }}
+            >
+              Last 7 Days
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                setStartDate(firstDay);
+                setEndDate(now);
+              }}
+            >
+              This Month
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                setStartDate(null);
+                setEndDate(null);
+              }}
+            >
+              All Time
+            </button>
+          </div>
+
           <div>
             <label className="block text-sm mb-1">Start Date</label>
             <input

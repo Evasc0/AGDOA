@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   collection,
-  query,
-  where,
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
@@ -34,13 +32,12 @@ export default function History() {
   const [minFare, setMinFare] = useState<number | null>(null);
 
   const fetchLogs = async () => {
-    let q = collection(db, 'rideLogs');
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(collection(db, 'rideLogs'));
     const data: RideLog[] = snapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data(),
+      ...(doc.data() as Omit<RideLog, 'id' | 'timestamp'>),
       timestamp: (doc.data().timestamp as Timestamp).toDate(),
-    })) as RideLog[];
+    }));
     setLogs(data);
     setFilteredLogs(data);
   };
@@ -49,38 +46,32 @@ export default function History() {
     fetchLogs();
   }, []);
 
-  const handleApplyFilters = async () => {
-    let q = collection(db, 'rideLogs');
-    const snapshot = await getDocs(q);
-    let data: RideLog[] = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: (doc.data().timestamp as Timestamp).toDate(),
-    })) as RideLog[];
+  const handleApplyFilters = async (): Promise<void> => {
+    let filtered = [...logs];
 
     if (startDate) {
-      data = data.filter((log) => log.timestamp >= startDate);
+      filtered = filtered.filter((log) => log.timestamp >= startDate);
     }
     if (endDate) {
-      data = data.filter((log) => log.timestamp <= endDate);
+      filtered = filtered.filter((log) => log.timestamp <= endDate);
     }
     if (pickupLocation) {
       const pickup = pickupLocation.toLowerCase();
-      data = data.filter((log) =>
+      filtered = filtered.filter((log) =>
         log.pickup.toLowerCase().includes(pickup)
       );
     }
     if (dropoffLocation) {
       const dropoff = dropoffLocation.toLowerCase();
-      data = data.filter((log) =>
+      filtered = filtered.filter((log) =>
         log.dropoff.toLowerCase().includes(dropoff)
       );
     }
     if (minFare !== null) {
-      data = data.filter((log) => log.fare >= minFare);
+      filtered = filtered.filter((log) => log.fare >= minFare);
     }
 
-    setFilteredLogs(data);
+    setFilteredLogs(filtered);
     setIsFilterOpen(false);
   };
 
