@@ -67,7 +67,7 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4 relative">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-00 text-white p-4 relative">
       <div className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Welcome, {driver?.name ?? "Driver"}</h2>
