@@ -8,14 +8,14 @@ import { getDatabase } from "firebase/database";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAjF3oLNRGFwh_BUYA4qF55zl0qw4dprwI",
-  authDomain: "agduwaqueue.firebaseapp.com",
-  databaseURL: "https://agduwaqueue-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "agduwaqueue",
-  storageBucket: "agduwaqueue.appspot.com", // corrected from "firebasestorage.app"
-  messagingSenderId: "242220098930",
-  appId: "1:242220098930:web:4b5332473f339ca1be69eb",
-  measurementId: "G-2CQ56KNPDZ"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
