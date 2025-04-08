@@ -1,3 +1,4 @@
+// src/pages/Analytics.tsx
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
@@ -94,7 +95,7 @@ const Analytics: React.FC = () => {
       const q = query(
         collection(db, 'ride_logs'),
         where('driverId', '==', user.uid),
-        where('timestamp', '>=', Timestamp.fromDate(new Date(today.getTime() - 6 * 86400000))) // past 7 days
+        where('timestamp', '>=', Timestamp.fromDate(new Date(today.getTime() - 6 * 86400000)))
       );
 
       const snapshot = await getDocs(q);
@@ -212,9 +213,9 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Graph */}
+      {/* Chart */}
       <div className="bg-gray-900 p-4 rounded-xl mt-6">
-        📈 <h2 className="text-lg font-semibold mb-2">7-Day Ride & Earnings Trend</h2>
+        <h2 className="text-lg font-semibold mb-2">📈 7-Day Ride & Earnings Trend</h2>
         <div className="overflow-x-auto">
           <div className="min-w-[320px] sm:min-w-full">
             <Bar
