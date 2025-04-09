@@ -47,7 +47,7 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
   return (
     <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold">AGDOA Queue</h1>
+        <h1 className="text-2xl font-bold">AGDUWA Queue</h1>
         <p className="text-sm text-gray-400">Automated Queueing System for Drivers</p>
       </div>
 
