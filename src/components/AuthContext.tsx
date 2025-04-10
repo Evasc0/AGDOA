@@ -1,57 +1,152 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 import { auth, db } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-// ✅ Custom driver user type
-export interface DriverUser {
-  uid: string;
-  displayName: string | null;
-  email: string | null;
-  plateNumber?: string;
-  vehicle?: string;
-  // add more fields if needed
-}
+const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
-interface AuthContextProps {
-  user: DriverUser | null;
-  loading: boolean;
-}
+  const navigate = useNavigate();
 
-const AuthContext = createContext<AuthContextProps>({ user: null, loading: true });
+  const handleAuth = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password.");
+      return;
+    }
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<DriverUser | null>(null);
-  const [loading, setLoading] = useState(true);
+    setLoading(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // 🔥 Fetch driver info from Firestore
-        const userDoc = await getDoc(doc(db, 'drivers', firebaseUser.uid));
-        const data = userDoc.data();
+    try {
+      let userCredential;
 
-        setUser({
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName,
-          email: firebaseUser.email,
-          plateNumber: data?.plateNumber || '',
-          vehicle: data?.vehicle || '',
+      if (isSignUp) {
+        // Sign up new user
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+        // Create Firestore driver document
+        const driverRef = doc(db, "drivers", userCredential.user.uid);
+        await setDoc(driverRef, {
+          displayName: email.split("@")[0] || "New Driver",
+          email,
+          plateNumber: "",
+          vehicle: "",
+          status: "Offline",
+          age: null,
+          contact: "",
+          paymentMethod: "",
+          paymentNumber: "",
+          profileImageUrl: "",
+          createdAt: serverTimestamp(),
+          lastOnline: serverTimestamp(),
         });
       } else {
-        setUser(null);
+        // Login existing user
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
-  }, []);
+      //test
+      navigate("/home");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
-      {children}
-    </AuthContext.Provider>
+    <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold">AGDUWA Queue</h1>
+        <p className="text-sm text-gray-400">Automated Queueing System for Drivers</p>
+      </div>
+
+      <div className="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow">
+        <h2 className="text-lg font-bold mb-4 text-center">
+          {isSignUp ? "Create Account" : "Driver Login"}
+        </h2>
+
+        <label className="block text-sm font-semibold mb-1">Email Address</label>
+        <input
+          type="email"
+          className="w-full p-2 rounded bg-gray-700 text-white mb-4"
+          placeholder="Enter your email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+        />
+
+        <label className="block text-sm font-semibold mb-1">Password</label>
+        <input
+          type="password"
+          className="w-full p-2 rounded bg-gray-700 text-white mb-6"
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
+        />
+
+        <button
+          onClick={handleAuth}
+          disabled={loading}
+          className={`w-full p-2 rounded font-semibold transition ${
+            loading
+              ? "bg-blue-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {loading
+            ? isSignUp
+              ? "Creating account..."
+              : "Logging in..."
+            : isSignUp
+            ? "Sign Up"
+            : "Login"}
+        </button>
+
+        <p className="mt-4 text-sm text-center text-gray-300">
+          {isSignUp ? "Already have an account?" : "Don’t have an account?"}{" "}
+          <span
+            className="text-blue-400 cursor-pointer underline"
+            onClick={() => setIsSignUp(!isSignUp)}
+          >
+            {isSignUp ? "Login here" : "Sign up"}
+          </span>
+        </p>
+
+        {loading && (
+          <div className="mt-4 flex justify-center">
+            <svg
+              className="animate-spin h-5 w-5 text-blue-400"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z"
+              />
+            </svg>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export default Login;

@@ -1,125 +1,150 @@
+// Login.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth, db } from "../firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  addDoc,
+} from "firebase/firestore";
 
 type LoginProps = {
   setIsAuthenticated: (auth: boolean) => void;
 };
 
 const Login = ({ setIsAuthenticated }: LoginProps) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [plate, setPlate] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = () => {
-    if (!name || !plate || !vehicle) {
-      alert("Please fill in all fields.");
+  const handleLogin = async () => {
+    if (!email || !password || !name || !plate || !vehicle) {
+      alert("Fill in all fields");
       return;
     }
 
     setLoading(true);
 
-    // Create a simple unique driver ID (can be improved later)
-    const id = `${plate.trim().toUpperCase()}-${name.trim().toLowerCase().replace(/\s+/g, "_")}`;
+    try {
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        // If account doesn't exist, create one
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      }
 
-    const driverData = {
-      id,
-      name,
-      plate,
-      vehicle,
-      status: "",
-      age: "",
-      contact: "",
-      image: null,
-      paymentMethod: "GCash",
-      paymentNumber: "",
-    };
+      const uid = userCredential.user.uid;
+      const driverRef = doc(db, "drivers", uid);
+      const docSnap = await getDoc(driverRef);
 
-    localStorage.setItem("driver", JSON.stringify(driverData));
+      const driverData = {
+        id: uid,
+        name,
+        plate,
+        vehicle,
+        email,
+        status: "online",
+        age: "",
+        contact: "",
+        image: null,
+        paymentMethod: "GCash",
+        paymentNumber: "",
+        createdAt: serverTimestamp(),
+      };
 
-    setTimeout(() => {
+      if (!docSnap.exists()) {
+        await setDoc(driverRef, driverData);
+      }
+
+      // Push to queue collection
+      await addDoc(collection(db, "queue"), {
+        driverId: uid,
+        name,
+        plate,
+        vehicle,
+        joinedAt: serverTimestamp(),
+      });
+
+      localStorage.setItem("driver", JSON.stringify(driverData));
       setIsAuthenticated(true);
-      navigate("/home");
-    }, 2000);
+      navigate("/queue");
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Login failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white">
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold">AGDUWA Queue</h1>
-        <p className="text-sm text-gray-400">Automated Queueing System for Drivers</p>
+        <p className="text-sm text-gray-400">Login or Register as Driver</p>
       </div>
 
       <div className="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow">
         <h2 className="text-lg font-bold mb-4 text-center">Driver Login</h2>
 
-        <label className="block text-sm font-semibold mb-1">Driver Name</label>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-2 mb-3 bg-gray-700 rounded"
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-2 mb-3 bg-gray-700 rounded"
+        />
         <input
           type="text"
-          className="w-full p-2 rounded bg-gray-700 text-white mb-4"
-          placeholder="Enter your full name"
+          placeholder="Driver Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          disabled={loading}
+          className="w-full p-2 mb-3 bg-gray-700 rounded"
         />
-
-        <label className="block text-sm font-semibold mb-1">Plate Number</label>
         <input
           type="text"
-          className="w-full p-2 rounded bg-gray-700 text-white mb-4"
-          placeholder="e.g., ABC-1234"
+          placeholder="Plate Number"
           value={plate}
           onChange={(e) => setPlate(e.target.value)}
-          disabled={loading}
+          className="w-full p-2 mb-3 bg-gray-700 rounded"
         />
-
-        <label className="block text-sm font-semibold mb-1">Vehicle Details</label>
         <input
           type="text"
-          className="w-full p-2 rounded bg-gray-700 text-white mb-6"
-          placeholder="e.g., Toyota FX White"
+          placeholder="Vehicle Info"
           value={vehicle}
           onChange={(e) => setVehicle(e.target.value)}
-          disabled={loading}
+          className="w-full p-2 mb-6 bg-gray-700 rounded"
         />
 
         <button
           onClick={handleLogin}
-          disabled={loading}
           className={`w-full p-2 rounded font-semibold transition ${
             loading
               ? "bg-blue-400 cursor-not-allowed"
               : "bg-blue-600 hover:bg-blue-700"
           }`}
+          disabled={loading}
         >
-          {loading ? "Logging in..." : "Login & Start Queue"}
+          {loading ? "Logging in..." : "Login / Sign Up"}
         </button>
-
-        {loading && (
-          <div className="mt-4 flex justify-center">
-            <svg
-              className="animate-spin h-5 w-5 text-blue-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z"
-              />
-            </svg>
-          </div>
-        )}
       </div>
     </div>
   );
