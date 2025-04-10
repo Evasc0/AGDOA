@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
-import Queue from "./pages/Queue";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Analytics from "./pages/Analytics";
@@ -32,7 +31,6 @@ const App = () => {
       {isAuthenticated && (
         <Route element={<Layout />}>
           <Route path="/home" element={<Home />} />
-          <Route path="/queue" element={<Queue />} />
           <Route path="/history" element={<History />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/profile" element={<Profile />} />

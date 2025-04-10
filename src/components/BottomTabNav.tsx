@@ -5,7 +5,6 @@ import { Home, Clock, BarChart2, List, User } from "lucide-react";
 const BottomTabNav = () => {
   const tabs = [
     { to: "/home", icon: Home, label: "Home" },
-    { to: "/queue", icon: Clock, label: "Queue" },
     { to: "/analytics", icon: BarChart2, label: "Analytics" },
     { to: "/history", icon: List, label: "History" },
     { to: "/profile", icon: User, label: "Profile" },
