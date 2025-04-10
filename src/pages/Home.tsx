@@ -1,3 +1,4 @@
+//src/pages/Home.tsx
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -89,7 +90,7 @@ const Home = () => {
             📍 <span className="font-semibold">Location Status:</span>
           </p>
           <p className={`${insideParadahan ? "text-green-400" : "text-red-400"} text-sm`}>
-            {error || (insideParadahan ? "Inside Atok Terminal" : "Outside the Terminal")}
+            {error || (insideParadahan ? "Inside Paradahan" : "Outside Paradahan")}
           </p>
         </div>
 

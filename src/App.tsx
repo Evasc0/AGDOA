@@ -1,3 +1,4 @@
+//src/App.tsx
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
@@ -16,7 +17,6 @@ const App = () => {
     const driver = localStorage.getItem("driver");
     setIsAuthenticated(!!driver);
   }, []);
-
 
   return (
     <Routes>

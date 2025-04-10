@@ -16,6 +16,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { useDriverLocation } from '../hooks/useDriverLocation';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface QueueEntry {
   id: string;
@@ -31,15 +32,17 @@ export default function QueuePage() {
   const [hasJoined, setHasJoined] = useState(false);
   const [estimatedWait, setEstimatedWait] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const { coords, insideParadahan, error } = useDriverLocation();
 
-  // 🔁 Real-time queue listener
+  // 🔁 Real-time listener
   useEffect(() => {
     if (!user) return;
 
     const q = query(collection(db, 'queues'), orderBy('joinedAt', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
+      const data = snapshot.docs.map((doc) => {
         const d = doc.data() as Omit<QueueEntry, 'id'>;
         return { ...d, id: doc.id };
       });
@@ -48,29 +51,30 @@ export default function QueuePage() {
       const pos = data.findIndex((d) => d.driverId === user.uid);
       setPosition(pos >= 0 ? pos + 1 : null);
       setHasJoined(pos >= 0);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [user]);
 
-  // ✅ Join or leave queue based on GPS
+  // ✅ Auto join/leave queue
   useEffect(() => {
-    const manageQueue = async () => {
-      if (!user || !coords) return;
+    if (!user || !coords) return;
 
+    const updateQueue = async () => {
       const driverRef = doc(db, 'queues', user.uid);
 
       if (insideParadahan && !hasJoined) {
         await setDoc(driverRef, {
           driverId: user.uid,
-          plateNumber: (user as any).plateNumber || null,
+          plateNumber: (user as any).plateNumber || 'N/A',
           joinedAt: Timestamp.now(),
         });
         setHasJoined(true);
-      } else if (!insideParadahan && hasJoined) {
-        await deleteDoc(driverRef);
+      }
 
-        // 🧠 Log geofence exit
+      if (!insideParadahan && hasJoined) {
+        await deleteDoc(driverRef);
         const [latitude, longitude] = coords;
         await setDoc(doc(db, 'geofence_logs', `${user.uid}_${Date.now()}`), {
           driverId: user.uid,
@@ -78,24 +82,23 @@ export default function QueuePage() {
           location: new GeoPoint(latitude, longitude),
           reason: 'left_geofence',
         });
-
         setHasJoined(false);
         setPosition(null);
       }
     };
 
-    manageQueue();
+    updateQueue();
   }, [insideParadahan, coords, user, hasJoined]);
 
-  // 📊 Fetch average wait time from logs
+  // 📊 Average wait time logic
   useEffect(() => {
     const fetchAverageWait = async () => {
       const q = query(collection(db, 'ride_logs'), orderBy('joinedAt', 'desc'), limit(50));
       const snapshot = await getDocs(q);
 
-      const waitTimes = snapshot.docs.map(doc => {
+      const waitTimes = snapshot.docs.map((doc) => {
         const { joinedAt, startedAt } = doc.data();
-        return (startedAt.toMillis() - joinedAt.toMillis()) / 60000; // in minutes
+        return (startedAt.toMillis() - joinedAt.toMillis()) / 60000;
       });
 
       const avg = waitTimes.length
@@ -105,24 +108,28 @@ export default function QueuePage() {
       setEstimatedWait(avg);
 
       const todayKey = new Date().toISOString().split('T')[0];
-      await setDoc(doc(db, 'daily_analytics', todayKey), {
-        averageWait: avg,
-        updatedAt: Timestamp.now(),
-      }, { merge: true });
+      await setDoc(
+        doc(db, 'daily_analytics', todayKey),
+        {
+          averageWait: avg,
+          updatedAt: Timestamp.now(),
+        },
+        { merge: true }
+      );
     };
 
     fetchAverageWait();
   }, [queue]);
 
-  // ⏱ Countdown logic
+  // ⏱ Countdown timer
   useEffect(() => {
     if (!estimatedWait || !position) return;
 
-    const total = estimatedWait * (position - 1);
-    setCountdown(Math.round(total));
+    const total = Math.round(estimatedWait * (position - 1));
+    setCountdown(total);
 
     const interval = setInterval(() => {
-      setCountdown(prev => (prev && prev > 0 ? prev - 1 : 0));
+      setCountdown((prev) => (prev && prev > 0 ? prev - 1 : 0));
     }, 60000);
 
     return () => clearInterval(interval);
@@ -132,29 +139,39 @@ export default function QueuePage() {
   const handleGoOffline = async () => {
     if (!user) return;
     await deleteDoc(doc(db, 'queues', user.uid));
-    setQueue([]);
-    setPosition(null);
     setHasJoined(false);
+    setPosition(null);
+    setQueue([]);
   };
 
   return (
-    <div className="max-w-xl mx-auto mt-10 bg-gray-800 p-6 rounded-xl shadow">
+    <div className="max-w-xl mx-auto mt-10 bg-gray-800 p-6 rounded-xl shadow text-white">
       <h2 className="text-xl font-bold mb-4">Queue Position</h2>
 
-      {/* 📍 GPS info */}
+      {/* 📍 Location Status */}
       <div className="text-sm mb-3">
         <p className="text-gray-400">📍 Location status:</p>
-        <p className={`${insideParadahan ? 'text-green-400' : 'text-red-400'}`}>
+        <p className={insideParadahan ? 'text-green-400' : 'text-red-400'}>
           {error || (insideParadahan ? 'Inside paradahan' : 'Outside paradahan – auto offline')}
         </p>
       </div>
 
-      {position ? (
+      {loading ? (
+        <p className="text-gray-400">Loading queue...</p>
+      ) : position ? (
         <>
+          {position === 1 && (
+            <div className="bg-yellow-600 text-white px-3 py-2 rounded mb-3 text-center animate-bounce">
+              🚖 It's your turn! Prepare to get a passenger.
+            </div>
+          )}
+
           <p className="text-green-400 mb-2">You are #{position} in queue</p>
 
           {estimatedWait !== null && (
-            <p className="text-yellow-400">⏱ Estimated wait: {Math.round(estimatedWait * (position - 1))} mins</p>
+            <p className="text-yellow-400">
+              ⏱ Estimated wait: {Math.round(estimatedWait * (position - 1))} mins
+            </p>
           )}
 
           {countdown !== null && (
@@ -162,12 +179,20 @@ export default function QueuePage() {
           )}
 
           {position > 1 && (
-            <ul className="list-disc ml-6">
-              {queue.slice(0, position - 1).map((d, i) => (
-                <li key={d.driverId}>
-                  #{i + 1} – Plate: {d.plateNumber || 'N/A'}
-                </li>
-              ))}
+            <ul className="list-disc ml-6 mt-2 text-sm text-gray-300">
+              <AnimatePresence>
+                {queue.slice(0, position - 1).map((d, i) => (
+                  <motion.li
+                    key={d.driverId}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    #{i + 1} – Plate: {d.plateNumber || 'N/A'}
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           )}
         </>
