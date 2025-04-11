@@ -1,3 +1,4 @@
+// src/pages/Admin.tsx
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -18,6 +19,7 @@ import {
   getAuth,
   sendEmailVerification,
   sendPasswordResetEmail,
+  signOut,
 } from "firebase/auth";
 import toast from "react-hot-toast";
 import EditDriverModal from "../components/EditDriverModal";
@@ -36,6 +38,23 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useNavigate } from "react-router-dom";
+
+interface Driver {
+  id: string;
+  name: string;
+  plate: string;
+  email: string;
+  status: "online" | "offline";
+  createdAt?: any;
+}
+
+interface QueueEntry {
+  driverId: string;
+  name: string;
+  plate: string;
+  joinedAt?: any;
+}
 
 const SortableItem = ({ id, name, plate, onRemove }: any) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
@@ -56,25 +75,25 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
 const Admin = () => {
   const db = getFirestore();
   const auth = getAuth();
+  const navigate = useNavigate();
 
-  const [drivers, setDrivers] = useState<any[]>([]);
-  const [queue, setQueue] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
-
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"drivers" | "logs" | "queue">("drivers");
 
   const [newDriver, setNewDriver] = useState({ email: "", password: "", name: "", plate: "" });
   const [showModal, setShowModal] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   useEffect(() => {
     const unsubDrivers = onSnapshot(collection(db, "drivers"), (snap) => {
-      setDrivers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setDrivers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Driver)));
     });
 
     const unsubQueue = onSnapshot(query(collection(db, "queue"), orderBy("joinedAt")), (snap) => {
-      setQueue(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setQueue(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as unknown as QueueEntry)));
     });
 
     const unsubLogs = onSnapshot(collection(db, "adminAccessLogs"), (snap) => {
@@ -99,7 +118,6 @@ const Admin = () => {
     const newQueue = arrayMove(queue, oldIndex, newIndex);
     setQueue(newQueue);
 
-    // Update Firestore
     const batch = writeBatch(db);
     newQueue.forEach((item, index) => {
       const ref = doc(db, "queue", item.driverId);
@@ -162,11 +180,11 @@ const Admin = () => {
     }
   };
 
-  const resendVerification = async (email: string) => {
+  const resendVerification = async () => {
     toast.error("Client SDK can't resend verification. Use Admin SDK.");
   };
 
-  const addToQueue = async (driver: any) => {
+  const addToQueue = async (driver: Driver) => {
     try {
       await setDoc(doc(db, "queue", driver.id), {
         driverId: driver.id,
@@ -199,17 +217,40 @@ const Admin = () => {
     (d) => d.status === "online" && !queue.find((q) => q.driverId === d.id)
   );
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Logged out");
+      navigate("/login");
+    } catch {
+      toast.error("Logout failed");
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const date = new Date(seconds * 1000);
+    return date.toLocaleString();
+  };
+
   return (
     <div className="p-4 max-w-6xl mx-auto text-white">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold">Admin Panel</h1>
-        <div className="space-x-2">
-          <button onClick={() => setTab("drivers")} className={`px-3 py-2 rounded ${tab === "drivers" ? "bg-blue-600" : "bg-gray-700"}`}>Drivers</button>
-          <button onClick={() => setTab("queue")} className={`px-3 py-2 rounded ${tab === "queue" ? "bg-blue-600" : "bg-gray-700"}`}>Queue</button>
-          <button onClick={() => setTab("logs")} className={`px-3 py-2 rounded ${tab === "logs" ? "bg-blue-600" : "bg-gray-700"}`}>Logs</button>
+        <div className="flex gap-2 items-center">
+          {["drivers", "queue", "logs"].map((type) => (
+            <button
+              key={type}
+              onClick={() => setTab(type as any)}
+              className={`px-3 py-2 rounded ${tab === type ? "bg-blue-600" : "bg-gray-700"}`}
+            >
+              {type[0].toUpperCase() + type.slice(1)}
+            </button>
+          ))}
+          <button onClick={handleLogout} className="px-3 py-2 rounded bg-red-600">Logout</button>
         </div>
       </div>
 
+      {/* DRIVERS */}
       {tab === "drivers" && (
         <>
           <input
@@ -270,6 +311,7 @@ const Admin = () => {
         </>
       )}
 
+      {/* QUEUE */}
       {tab === "queue" && (
         <div className="bg-gray-800 p-4 rounded mt-4">
           <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
@@ -304,6 +346,7 @@ const Admin = () => {
         </div>
       )}
 
+      {/* LOGS */}
       {tab === "logs" && (
         <div className="mt-4 bg-gray-800 p-4 rounded">
           <h2 className="text-lg font-bold mb-2">Admin Activity Logs</h2>
@@ -313,7 +356,7 @@ const Admin = () => {
                 <p className="text-sm">
                   <strong>{log.email}</strong> —{" "}
                   {log.accessedAt?.seconds
-                    ? new Date(log.accessedAt.seconds * 1000).toLocaleString()
+                    ? formatTime(log.accessedAt.seconds)
                     : "No time"}
                 </p>
               </div>
@@ -322,7 +365,7 @@ const Admin = () => {
         </div>
       )}
 
-      {showModal && (
+      {showModal && selectedDriver && (
         <EditDriverModal
           driver={selectedDriver}
           onClose={() => setShowModal(false)}
