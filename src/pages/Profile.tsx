@@ -5,13 +5,18 @@ import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../components/AuthContext";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { signOut } from "firebase/auth";
-import { db, auth } from "../firebase"; // ✅ Make sure `auth` is exported from your firebase.ts
+import { db } from "../firebase";
+import toast from "react-hot-toast";
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [driver, setDriver] = useState<any>(null);
+  const { user, logout } = useAuth();
+
+  const [driver, setDriver] = useState<any>(() => {
+    const stored = localStorage.getItem("driver");
+    return stored ? JSON.parse(stored) : null;
+  });
+
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState("");
   const [age, setAge] = useState("");
@@ -49,13 +54,12 @@ const Profile = () => {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    try {
-      await signOut(auth); // ✅ Properly sign out Firebase auth
-      localStorage.removeItem("driver"); // Optional: if you're storing any driver info locally
+    setTimeout(async () => {
+      await logout?.();
+      localStorage.removeItem("driver");
+      toast.success("Logout successful!");
       navigate("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+    }, 500);
   };
 
   const handleSave = async () => {
@@ -75,6 +79,7 @@ const Profile = () => {
     await updateDoc(ref, updated);
     setDriver(updated);
     setEditing(false);
+    toast.success("Profile updated!");
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +109,7 @@ const Profile = () => {
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.4 }}
           >
-            {/* Profile Image */}
+            {/* Profile Image Section */}
             <div className="flex flex-col items-center mb-4 relative">
               <div
                 className="w-24 h-24 rounded-full overflow-hidden bg-gray-700 mb-2 cursor-pointer border-2 border-white hover:scale-105 transition-transform"
@@ -135,21 +140,33 @@ const Profile = () => {
               <div>
                 <strong>Status:</strong>{" "}
                 {editing ? (
-                  <input value={status} onChange={(e) => setStatus(e.target.value)} className="bg-gray-700 rounded p-1 ml-2 w-full" />
+                  <input
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                  />
                 ) : status}
               </div>
 
               <div>
                 <strong>Age:</strong>{" "}
                 {editing ? (
-                  <input value={age} onChange={(e) => setAge(e.target.value)} className="bg-gray-700 rounded p-1 ml-2 w-full" />
+                  <input
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                  />
                 ) : age}
               </div>
 
               <div>
                 <strong>Contact:</strong>{" "}
                 {editing ? (
-                  <input value={contact} onChange={(e) => setContact(e.target.value)} className="bg-gray-700 rounded p-1 ml-2 w-full" />
+                  <input
+                    value={contact}
+                    onChange={(e) => setContact(e.target.value)}
+                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                  />
                 ) : contact}
               </div>
 
@@ -170,7 +187,11 @@ const Profile = () => {
               <div>
                 <strong>{paymentMethod} Number:</strong>{" "}
                 {editing ? (
-                  <input value={paymentNumber} onChange={(e) => setPaymentNumber(e.target.value)} className="bg-gray-700 rounded p-1 ml-2 w-full" />
+                  <input
+                    value={paymentNumber}
+                    onChange={(e) => setPaymentNumber(e.target.value)}
+                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                  />
                 ) : paymentNumber || "N/A"}
               </div>
             </div>

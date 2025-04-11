@@ -1,5 +1,3 @@
-// src/pages/Home.tsx
-
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -13,9 +11,12 @@ import {
   query,
   orderBy,
   Timestamp,
+  addDoc,
 } from "firebase/firestore";
 import { useDriverLocation } from "../hooks/useDriverLocation";
 import { motion, AnimatePresence } from "framer-motion";
+
+const AVG_WAIT_MINUTES = 5;
 
 const Home = () => {
   const [driver, setDriver] = useState<any>(null);
@@ -25,6 +26,8 @@ const Home = () => {
   const [queue, setQueue] = useState<any[]>([]);
   const [position, setPosition] = useState<number | null>(null);
   const [toastMsg, setToastMsg] = useState("");
+  const [rideStart, setRideStart] = useState<any>(null);
+  const [countdown, setCountdown] = useState<string>("--:--");
 
   const { coords, insideParadahan, error } = useDriverLocation();
 
@@ -33,7 +36,7 @@ const Home = () => {
     if (stored) setDriver(JSON.parse(stored));
   }, []);
 
-  // Auto-join only if inside the paradahan
+  // Auto-join queue if inside paradahan
   useEffect(() => {
     const joinIfInside = async () => {
       if (driver && isOnline && insideParadahan && !hasJoined && !manualOffline) {
@@ -49,9 +52,9 @@ const Home = () => {
     joinIfInside();
   }, [insideParadahan, coords, driver, hasJoined, manualOffline, isOnline]);
 
-  // Remove from queue if outside
+  // Remove from queue + start ride log if outside
   useEffect(() => {
-    const removeIfOutside = async () => {
+    const handleExitParadahan = async () => {
       if (driver && hasJoined && !insideParadahan) {
         await deleteDoc(doc(db, "queues", driver.id));
         setHasJoined(false);
@@ -59,12 +62,44 @@ const Home = () => {
         setQueue([]);
         setToastMsg("⛔ You left the paradahan. Removed from the queue.");
         setTimeout(() => setToastMsg(""), 4000);
+
+        // Start ride log
+        setRideStart({
+          startedAt: Timestamp.now(),
+          departure: coords,
+        });
       }
     };
-    removeIfOutside();
+    handleExitParadahan();
   }, [insideParadahan, driver, hasJoined]);
 
-  // Subscribe to real-time queue
+  // End ride log when re-entering
+  useEffect(() => {
+    const endRide = async () => {
+      if (rideStart && insideParadahan) {
+        const endedAt = Timestamp.now();
+        const travelTimeMin =
+          (endedAt.toMillis() - rideStart.startedAt.toMillis()) / 60000;
+
+        await addDoc(collection(db, "rideLogs"), {
+          driverId: driver?.id,
+          plateNumber: driver?.plate,
+          startedAt: rideStart.startedAt,
+          endedAt,
+          travelTimeMin,
+          departure: rideStart.departure,
+          returnLocation: coords,
+        });
+
+        setRideStart(null);
+        setToastMsg("✅ Ride completed and logged.");
+        setTimeout(() => setToastMsg(""), 3000);
+      }
+    };
+    endRide();
+  }, [insideParadahan, coords]);
+
+  // Real-time queue listener
   useEffect(() => {
     const q = query(collection(db, "queues"), orderBy("joinedAt"));
     const unsub = onSnapshot(q, (snapshot) => {
@@ -76,6 +111,24 @@ const Home = () => {
 
     return () => unsub();
   }, [driver]);
+
+  // Countdown timer
+  useEffect(() => {
+    let interval: any;
+    if (position) {
+      interval = setInterval(() => {
+        const totalSec = position * AVG_WAIT_MINUTES * 60;
+        const now = Date.now();
+        const estimatedTime = totalSec - Math.floor((now / 1000) % totalSec);
+        const mins = Math.floor(estimatedTime / 60);
+        const secs = estimatedTime % 60;
+        setCountdown(`${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`);
+      }, 1000);
+    } else {
+      setCountdown("--:--");
+    }
+    return () => clearInterval(interval);
+  }, [position]);
 
   const handleGoOffline = async () => {
     if (!driver) return;
@@ -154,6 +207,13 @@ const Home = () => {
               Your position:{" "}
               <span className="font-semibold text-yellow-300">
                 {position ?? "N/A"}
+              </span>
+            </p>
+
+            <p className="text-sm mb-2">
+              ⏳ Estimated Wait:{" "}
+              <span className="font-semibold text-blue-300">
+                {countdown}
               </span>
             </p>
 
