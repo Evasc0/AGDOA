@@ -1,17 +1,18 @@
-import { useState } from "react";
+// src/components/EditDriverModal.tsx
+import { useState, useEffect } from "react";
 import { doc, updateDoc, getFirestore } from "firebase/firestore";
 import toast from "react-hot-toast";
+import classNames from "classnames";
 
-const EditDriverModal = ({
-  driver,
-  onClose,
-  onSaveSuccess,
-}: {
+interface EditDriverModalProps {
   driver: any;
   onClose: () => void;
   onSaveSuccess: () => void;
-}) => {
+}
+
+const EditDriverModal = ({ driver, onClose, onSaveSuccess }: EditDriverModalProps) => {
   const db = getFirestore();
+  const [visible, setVisible] = useState(false);
 
   const [form, setForm] = useState({
     name: driver.name || "",
@@ -24,21 +25,46 @@ const EditDriverModal = ({
 
   const [loading, setLoading] = useState(false);
 
-  const handleUpdate = async () => {
-    // ✅ Basic validation
-    if (!form.name || !form.plate || !form.contact || !form.age) {
+  // Trigger animation after mount
+  useEffect(() => {
+    setTimeout(() => setVisible(true), 10);
+  }, []);
+
+  const validateFields = () => {
+    const { name, plate, contact, age } = form;
+
+    if (!name || !plate || !contact || !age) {
       toast.error("Please fill in all required fields");
-      return;
+      return false;
     }
+
+    const phoneRegex = /^[0-9]{10,13}$/;
+    if (!phoneRegex.test(contact)) {
+      toast.error("Enter a valid contact number");
+      return false;
+    }
+
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+      toast.error("Enter a valid age (18–100)");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleUpdate = async () => {
+    if (!validateFields()) return;
 
     try {
       setLoading(true);
       await updateDoc(doc(db, "drivers", driver.id), {
         ...form,
+        age: parseInt(form.age),
       });
       toast.success("Driver updated");
-      onSaveSuccess(); // 🔄 Refresh list in parent
-      onClose(); // ✅ Close modal
+      onSaveSuccess();
+      handleClose();
     } catch (err) {
       console.error(err);
       toast.error("Update failed");
@@ -47,9 +73,22 @@ const EditDriverModal = ({
     }
   };
 
+  const handleClose = () => {
+    setVisible(false);
+    setTimeout(() => onClose(), 250); // match exit animation duration
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center transition-opacity duration-300">
-      <div className="bg-gray-900 p-6 rounded-lg max-w-md w-full animate-fade-in">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div
+        className={classNames(
+          "bg-gray-900 p-6 rounded-lg max-w-md w-full transform transition-all duration-300",
+          {
+            "scale-100 opacity-100": visible,
+            "scale-95 opacity-0": !visible,
+          }
+        )}
+      >
         <h2 className="text-lg font-bold text-white mb-4">Edit Driver</h2>
 
         <div className="space-y-3">
@@ -100,7 +139,7 @@ const EditDriverModal = ({
 
         <div className="flex justify-end mt-6 space-x-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
             disabled={loading}
           >
