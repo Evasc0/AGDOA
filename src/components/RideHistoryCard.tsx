@@ -1,3 +1,4 @@
+// src/components/RideHistoryCard.tsx
 import React from 'react';
 
 interface RideLog {
@@ -8,6 +9,7 @@ interface RideLog {
   pickup: string;
   dropoff: string;
   fare: number;
+  lastTurningPoint?: string;
 }
 
 interface RideHistoryCardProps {
@@ -23,6 +25,11 @@ export default function RideHistoryCard({ log }: RideHistoryCardProps) {
       <div className="mt-1 text-base font-semibold">
         {log.pickup} → {log.dropoff}
       </div>
+      {log.lastTurningPoint && (
+        <div className="text-xs text-yellow-300 mt-1 italic">
+          Last Turn: {log.lastTurningPoint}
+        </div>
+      )}
       <div className="text-sm mt-1">
         Distance: {log.distance} km · Duration: {log.duration} mins
       </div>

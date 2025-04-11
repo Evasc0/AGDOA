@@ -1,14 +1,18 @@
+// src/pages/History.tsx
 import React, { useEffect, useState } from 'react';
 import {
   collection,
   getDocs,
   Timestamp,
+  query,
+  where,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import RideHistoryCard from '../components/RideHistoryCard';
 import RideHistoryFilterModal from '../components/RideHistoryFilterModal';
 import { Button } from '../components/ui/button';
 import { Filter } from 'lucide-react';
+import { useAuth } from '../components/AuthContext'; // 👈 make sure you're using this hook to get auth
 
 interface RideLog {
   id: string;
@@ -18,33 +22,47 @@ interface RideLog {
   pickup: string;
   dropoff: string;
   fare: number;
+  lastTurningPoint?: string;
 }
 
 export default function History() {
   const [logs, setLogs] = useState<RideLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<RideLog[]>([]);
-
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [pickupLocation, setPickupLocation] = useState('');
   const [dropoffLocation, setDropoffLocation] = useState('');
   const [minFare, setMinFare] = useState<number | null>(null);
 
+  const { user } = useAuth(); // 🔐 current logged-in user
+
   const fetchLogs = async () => {
-    const snapshot = await getDocs(collection(db, 'rideLogs'));
-    const data: RideLog[] = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Omit<RideLog, 'id' | 'timestamp'>),
-      timestamp: (doc.data().timestamp as Timestamp).toDate(),
-    }));
-    setLogs(data);
-    setFilteredLogs(data);
+    try {
+      if (!user) return;
+
+      const rideLogsRef = collection(db, 'ride_logs');
+      const q = query(rideLogsRef, where('driverId', '==', user.uid));
+
+      const snapshot = await getDocs(q);
+      const data: RideLog[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Omit<RideLog, 'id' | 'timestamp'>),
+        timestamp: (doc.data().timestamp as Timestamp).toDate(),
+        lastTurningPoint: doc.data().lastTurningPoint || '', // fallback
+      }));
+
+      setLogs(data);
+      setFilteredLogs(data);
+    } catch (error) {
+      console.error('Failed to fetch ride logs:', error);
+    }
   };
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [user]);
 
   const handleApplyFilters = async (): Promise<void> => {
     let filtered = [...logs];
