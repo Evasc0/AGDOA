@@ -1,3 +1,4 @@
+//src/pages/Home.tsx
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -179,7 +180,7 @@ const Home = () => {
               </div>
             </div>
           </div>
-        )}
+        )}S
       </div>
 
       {toastMsg && (

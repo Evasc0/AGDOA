@@ -1,7 +1,6 @@
 // src/pages/Login.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth, db } from "../firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -12,40 +11,43 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { auth, db } from "../firebase";
+import toast, { Toaster } from "react-hot-toast";
 
-type LoginProps = {
-  setIsAuthenticated: (auth: boolean) => void;
-};
+const ADMIN_EMAILS = ["admin@agduwa.com"]; // Add your admin emails here
 
-const Login = ({ setIsAuthenticated }: LoginProps) => {
+const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [plate, setPlate] = useState("");
   const [vehicle, setVehicle] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
   const navigate = useNavigate();
 
+  // Auto-redirect if already logged in
   useEffect(() => {
-    if (successMsg) {
-      const timeout = setTimeout(() => setSuccessMsg(""), 4000);
-      return () => clearTimeout(timeout);
+    const stored = localStorage.getItem("driver");
+    if (stored) {
+      const data = JSON.parse(stored);
+      if (ADMIN_EMAILS.includes(data.email)) {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
     }
-  }, [successMsg]);
+  }, [navigate]);
 
   const handleAuth = async () => {
     if (!email || !password || (isSignUp && (!name || !plate || !vehicle))) {
-      setErrorMsg("Please fill in all required fields.");
+      toast.error("Please fill all fields.");
       return;
     }
 
     setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
 
     try {
       let userCredential;
@@ -60,7 +62,7 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
           plate,
           vehicle,
           email,
-          status: "online",
+          status: "offline",
           age: "",
           contact: "",
           image: null,
@@ -71,10 +73,8 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
 
         await setDoc(doc(db, "drivers", uid), driverData);
         localStorage.setItem("driver", JSON.stringify(driverData));
-        setIsAuthenticated(true);
-        setSuccessMsg("Account created successfully!");
-
-        setTimeout(() => navigate("/"), 1200);
+        toast.success("Registered successfully!");
+        setTimeout(() => navigate("/home"), 1000);
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
@@ -82,34 +82,38 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
         const docSnap = await getDoc(driverRef);
 
         if (!docSnap.exists()) {
-          setErrorMsg("Account exists but no profile was found.");
+          toast.error("No profile found for this account.");
           return;
         }
 
         const driverData = { id: uid, ...docSnap.data() };
         localStorage.setItem("driver", JSON.stringify(driverData));
-        setIsAuthenticated(true);
-        setSuccessMsg("Login successful!");
 
-        setTimeout(() => navigate("/"), 1200);
+        if (ADMIN_EMAILS.includes(email)) {
+          toast.success("Welcome, Admin!");
+          setTimeout(() => navigate("/admin"), 1000);
+        } else {
+          toast.success("Welcome back!");
+          setTimeout(() => navigate("/home"), 1000);
+        }
       }
-    } catch (err: any) {
-      console.error("Auth error:", err.code);
-      switch (err.code) {
+    } catch (error: any) {
+      console.error(error.code);
+      switch (error.code) {
         case "auth/user-not-found":
-          setErrorMsg("No account found with this email.");
+          toast.error("Account not found.");
           break;
         case "auth/wrong-password":
-          setErrorMsg("Incorrect password.");
+          toast.error("Incorrect password.");
           break;
         case "auth/email-already-in-use":
-          setErrorMsg("Email already in use.");
+          toast.error("Email already in use.");
           break;
         case "auth/invalid-email":
-          setErrorMsg("Invalid email format.");
+          toast.error("Invalid email.");
           break;
         default:
-          setErrorMsg("Something went wrong.");
+          toast.error("Authentication failed.");
       }
     } finally {
       setLoading(false);
@@ -117,34 +121,28 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
   };
 
   return (
-    <div className="flex flex-col justify-center items-center h-screen bg-gray-900 text-white px-4">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold">AGDUWA Queue</h1>
-        <p className="text-sm text-gray-400">
-          {isSignUp ? "Register as a New Driver" : "Login to Your Account"}
-        </p>
-      </div>
-
-      <div className="bg-gray-800 p-6 rounded-xl w-full max-w-md shadow relative animate-fade-in">
-        <h2 className="text-lg font-bold mb-4 text-center">
-          {isSignUp ? "Driver Sign Up" : "Driver Login"}
-        </h2>
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4">
+      <Toaster position="top-center" />
+      <div className="bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-2 text-center">
+          {isSignUp ? "Sign Up" : "Login"}
+        </h1>
 
         <input
           type="email"
           placeholder="Email"
+          className="w-full p-2 mb-3 bg-gray-700 rounded"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full p-2 mb-3 bg-gray-700 rounded"
         />
 
         <div className="relative mb-3">
           <input
             type={showPassword ? "text" : "password"}
             placeholder="Password"
+            className="w-full p-2 bg-gray-700 rounded pr-10"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2 bg-gray-700 rounded pr-10"
           />
           <button
             onClick={() => setShowPassword(!showPassword)}
@@ -158,73 +156,50 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
           <>
             <input
               type="text"
-              placeholder="Driver Name"
+              placeholder="Full Name"
+              className="w-full p-2 mb-3 bg-gray-700 rounded"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-2 mb-3 bg-gray-700 rounded"
             />
             <input
               type="text"
               placeholder="Plate Number"
+              className="w-full p-2 mb-3 bg-gray-700 rounded"
               value={plate}
               onChange={(e) => setPlate(e.target.value)}
-              className="w-full p-2 mb-3 bg-gray-700 rounded"
             />
             <input
               type="text"
-              placeholder="Vehicle Info"
+              placeholder="Vehicle"
+              className="w-full p-2 mb-3 bg-gray-700 rounded"
               value={vehicle}
               onChange={(e) => setVehicle(e.target.value)}
-              className="w-full p-2 mb-6 bg-gray-700 rounded"
             />
           </>
         )}
 
-        {errorMsg && (
-          <div className="bg-red-600 text-white text-sm px-4 py-2 rounded mb-3 animate-fade-in">
-            {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="bg-green-600 text-white text-sm px-4 py-2 rounded mb-3 animate-fade-in">
-            {successMsg}
-          </div>
-        )}
-
         <button
           onClick={handleAuth}
-          className={`w-full flex justify-center items-center gap-2 p-2 rounded font-semibold transition duration-300 ${
-            loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-          }`}
           disabled={loading}
+          className={`w-full py-2 px-4 mt-2 rounded font-semibold ${
+            loading
+              ? "bg-blue-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
-          {loading && (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          )}
-          {loading ? "Processing..." : isSignUp ? "Sign Up" : "Login"}
+          {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
         </button>
 
-        <p className="text-center text-sm mt-4 text-gray-400">
+        <p className="text-sm text-center text-gray-400 mt-4">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-blue-400 hover:underline"
           >
-            {isSignUp ? "Login" : "Sign Up"}
+            {isSignUp ? "Login here" : "Register"}
           </button>
         </p>
       </div>
-
-      <style>{`
-        .animate-fade-in {
-          animation: fadeIn 0.4s ease-in-out;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-5px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 };
