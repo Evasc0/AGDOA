@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { isInsideParadahan } from "../utils/geofence";
 
 export function useDriverLocation() {
-  const [coords, setCoords] = useState<[number, number] | null>(null);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [insideParadahan, setInsideParadahan] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,12 +16,11 @@ export function useDriverLocation() {
     const watcher = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const coord: [number, number] = [longitude, latitude];
-        setCoords(coord);
-        setInsideParadahan(isInsideParadahan(coord));
+        setCoords({ latitude, longitude });
+        setInsideParadahan(isInsideParadahan([longitude, latitude])); // still pass tuple to geofence util
         setError(null);
       },
-      (err) => {
+      () => {
         setError("Location access denied.");
       },
       {
