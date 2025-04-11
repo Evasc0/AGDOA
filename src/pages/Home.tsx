@@ -180,7 +180,7 @@ const Home = () => {
               </div>
             </div>
           </div>
-        )}S
+        )}
       </div>
 
       {toastMsg && (

@@ -2,7 +2,12 @@
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { auth } from "./firebase";
 
 import Home from "./pages/Home";
@@ -15,6 +20,7 @@ import DriverPublicProfile from "./pages/DriverPublicProfile";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { Toaster, toast } from "react-hot-toast";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 
@@ -27,7 +33,8 @@ const App = () => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const isAdminUser = firebaseUser.email?.toLowerCase() === ADMIN_EMAIL?.toLowerCase();
+        const isAdminUser =
+          firebaseUser.email?.toLowerCase() === ADMIN_EMAIL?.toLowerCase();
 
         if (isAdminUser) {
           try {
@@ -69,6 +76,7 @@ const App = () => {
     <>
       <Toaster position="top-center" />
       <Routes>
+        {/* Root route */}
         <Route
           path="/"
           element={
@@ -84,6 +92,7 @@ const App = () => {
           }
         />
 
+        {/* Protected routes */}
         {isAuthenticated && (
           <Route element={<Layout />}>
             <Route path="/home" element={<Home />} />
@@ -91,12 +100,21 @@ const App = () => {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/driver/:id" element={<DriverPublicProfile />} />
-            {isAdmin && <Route path="/admin" element={<Admin />} />}
           </Route>
         )}
 
+        {/* Admin route wrapped with protection */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedAdminRoute>
+              <Admin />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        {/* Fallbacks */}
         {!isAuthenticated && <Route path="*" element={<Navigate to="/" />} />}
-        {isAuthenticated && !isAdmin && <Route path="/admin" element={<Navigate to="/home" />} />}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
