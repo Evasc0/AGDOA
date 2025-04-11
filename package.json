@@ -12,6 +12,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@headlessui/react": "^2.2.1",
+    "@react-google-maps/api": "^2.20.6",
     "@turf/helpers": "^7.2.0",
     "@turf/turf": "^7.2.0",
     "axios": "^1.8.4",
@@ -21,7 +22,6 @@
     "dayjs": "^1.11.13",
     "firebase": "^11.6.0",
     "framer-motion": "^12.6.3",
-    "leaflet": "^1.9.4",
     "lucide-react": "^0.487.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
@@ -30,7 +30,6 @@
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
-    "react-leaflet": "^5.0.0",
     "react-qr-code": "^2.0.15",
     "react-router-dom": "^7.5.0",
     "recharts": "^2.15.2"
