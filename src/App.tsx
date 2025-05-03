@@ -31,6 +31,8 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Firebase User:", firebaseUser); // Debug log
+
       if (firebaseUser) {
         setUser(firebaseUser);
         const isAdminUser =
@@ -53,7 +55,6 @@ const App = () => {
       } else {
         setUser(null);
       }
-
       setLoading(false);
     });
 
@@ -92,18 +93,20 @@ const App = () => {
           }
         />
 
-        {/* Protected routes */}
+        {/* Public route for viewing driver profiles (accessible without login) */}
+        <Route path="/driver/:id" element={<DriverPublicProfile />} />
+
+        {/* Protected routes, accessible only if authenticated */}
         {isAuthenticated && (
           <Route element={<Layout />}>
             <Route path="/home" element={<Home />} />
             <Route path="/history" element={<History />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/driver/:id" element={<DriverPublicProfile />} />
           </Route>
         )}
 
-        {/* Admin route wrapped with protection */}
+        {/* Admin route with protection */}
         <Route
           path="/admin"
           element={
@@ -113,13 +116,14 @@ const App = () => {
           }
         />
 
-        {/* Fallbacks */}
+        {/* Redirect unauthenticated users trying to access protected routes */}
         {!isAuthenticated && <Route path="*" element={<Navigate to="/" />} />}
+
+        {/* Not Found fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
 };
 
-// Export the App component as default
 export default App;

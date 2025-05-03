@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../firebase"; // Ensure this imports your Firestore instance
+import { QRCodeSVG } from "qrcode.react";
+
+interface Driver {
+  name: string;
+  plate: string;
+  vehicle: string;
+  status: string;
+  age: number;
+  contact: string;
+  paymentMethod: string;
+  paymentNumber: string;
+  image?: string; // Optional
+}
 
 const DriverProfilePublic = () => {
   const { id } = useParams<{ id: string }>();
-  const [driver, setDriver] = useState<any | null>(null);
+  const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,10 +29,10 @@ const DriverProfilePublic = () => {
       }
 
       try {
-        const docRef = doc(db, "drivers", id); // Ensure id is defined
+        const docRef = doc(db, "publicProfiles", id); // Fetch from publicProfiles
         const snapshot = await getDoc(docRef);
         if (snapshot.exists()) {
-          setDriver(snapshot.data());
+          setDriver(snapshot.data() as Driver); // Cast to Driver type
         } else {
           setDriver(null);
         }
@@ -119,7 +131,7 @@ const DriverProfilePublic = () => {
           <div className="bg-white p-4 rounded-lg w-fit mx-auto">
             <QRCodeSVG value={profileUrl} size={150} />
           </div>
-          <p className="text-xs mt -2 text-gray-400 break-all">{profileUrl}</p>
+          <p className="text-xs mt-2 text-gray-400 break-all">{profileUrl}</p>
         </div>
       </div>
     </div>
