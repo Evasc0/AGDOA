@@ -10,14 +10,14 @@ const DriverProfilePublic = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-
     const fetchDriver = async () => {
+      if (!id) {
+        setLoading(false);
+        return; // Exit if id is undefined
+      }
+
       try {
-        const docRef = doc(db, "drivers", id);
+        const docRef = doc(db, "drivers", id); // Ensure id is defined
         const snapshot = await getDoc(docRef);
         if (snapshot.exists()) {
           setDriver(snapshot.data());
@@ -46,10 +46,7 @@ const DriverProfilePublic = () => {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-900 text-white p-4">
         <p className="mb-4">Driver profile not found.</p>
-        <Link
-          to="/"
-          className="text-blue-500 hover:underline"
-        >
+        <Link to="/" className="text-blue-500 hover:underline">
           Return to Home
         </Link>
       </div>
@@ -122,17 +119,7 @@ const DriverProfilePublic = () => {
           <div className="bg-white p-4 rounded-lg w-fit mx-auto">
             <QRCodeSVG value={profileUrl} size={150} />
           </div>
-          <p className="text-xs mt-2 text-gray-400 break-all">{profileUrl}</p>
-        </div>
-
-        {/* Back to Home Link */}
-        <div className="mt-6 text-center">
-          <Link
-            to="/"
-            className="text-blue-400 hover:underline text-sm"
-          >
-            Back to Home
-          </Link>
+          <p className="text-xs mt -2 text-gray-400 break-all">{profileUrl}</p>
         </div>
       </div>
     </div>
