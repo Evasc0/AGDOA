@@ -1,4 +1,3 @@
-// src/pages/History.tsx
 import React, { useEffect, useState } from 'react';
 import {
   collection,
@@ -12,17 +11,26 @@ import RideHistoryCard from '../components/RideHistoryCard';
 import RideHistoryFilterModal from '../components/RideHistoryFilterModal';
 import { Button } from '../components/ui/button';
 import { Filter } from 'lucide-react';
-import { useAuth } from '../components/AuthContext'; // 👈 make sure you're using this hook to get auth
+import { useAuth } from '../components/AuthContext'; // Hook to get logged-in user
 
 interface RideLog {
   id: string;
-  timestamp: Date;
-  duration: number;
-  distance: number;
-  pickup: string;
-  dropoff: string;
-  fare: number;
-  lastTurningPoint?: string;
+  driverId: string;
+  dropoffLocation: {
+    lat: number;
+    lng: number;
+  };
+  dropoffName: string;
+  endedAt: Date; // This will be the timestamp for when the ride ended
+  estimatedEarnings: number;
+  pickupLocation: {
+    lat: number;
+    lng: number;
+  };
+  plateNumber: string;
+  startedAt: Date; // This will be the timestamp for when the ride started
+  travelTimeMinutes: number;
+  waitTimeMinutes: number;
 }
 
 export default function History() {
@@ -36,8 +44,9 @@ export default function History() {
   const [dropoffLocation, setDropoffLocation] = useState('');
   const [minFare, setMinFare] = useState<number | null>(null);
 
-  const { user } = useAuth(); // 🔐 current logged-in user
+  const { user } = useAuth();
 
+  // Fetch ride logs for current user
   const fetchLogs = async () => {
     try {
       if (!user) return;
@@ -46,12 +55,30 @@ export default function History() {
       const q = query(rideLogsRef, where('driverId', '==', user.uid));
 
       const snapshot = await getDocs(q);
-      const data: RideLog[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<RideLog, 'id' | 'timestamp'>),
-        timestamp: (doc.data().timestamp as Timestamp).toDate(),
-        lastTurningPoint: doc.data().lastTurningPoint || '', // fallback
-      }));
+      // Debug logs
+      console.log('Fetched snapshot:', snapshot);
+
+      const data: RideLog[] = snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        return {
+          id: doc.id,
+          driverId: docData.driverId,
+          dropoffLocation: docData.dropoffLocation,
+          dropoffName: docData.dropoffName,
+          endedAt: (docData.endedAt as Timestamp).toDate(),
+          estimatedEarnings: docData.estimatedEarnings,
+          pickupLocation: docData.pickupLocation,
+          plateNumber: docData.plateNumber,
+          startedAt: (docData.startedAt as Timestamp).toDate(),
+          travelTimeMinutes: docData.travelTimeMinutes,
+          waitTimeMinutes: docData.waitTimeMinutes,
+        };
+      });
+
+      console.log('Parsed ride logs:', data);
+
+      // Sort logs by endedAt in descending order (most recent first)
+      data.sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime());
 
       setLogs(data);
       setFilteredLogs(data);
@@ -64,47 +91,53 @@ export default function History() {
     fetchLogs();
   }, [user]);
 
+  // Apply filters to logs
   const handleApplyFilters = async (): Promise<void> => {
     let filtered = [...logs];
 
-    if (startDate) {
-      filtered = filtered.filter((log) => log.timestamp >= startDate);
-    }
-    if (endDate) {
-      filtered = filtered.filter((log) => log.timestamp <= endDate);
-    }
+    if (startDate) filtered = filtered.filter(log => log.endedAt >= startDate);
+    if (endDate) filtered = filtered.filter(log => log.endedAt <= endDate);
     if (pickupLocation) {
       const pickup = pickupLocation.toLowerCase();
-      filtered = filtered.filter((log) =>
-        log.pickup.toLowerCase().includes(pickup)
+      filtered = filtered.filter(log => 
+        `${log.pickupLocation.lat}, ${log.pickupLocation.lng}`.toLowerCase().includes(pickup)
       );
     }
     if (dropoffLocation) {
       const dropoff = dropoffLocation.toLowerCase();
-      filtered = filtered.filter((log) =>
-        log.dropoff.toLowerCase().includes(dropoff)
-      );
+      filtered = filtered.filter(log => log.dropoffName.toLowerCase().includes(dropoff));
     }
     if (minFare !== null) {
-      filtered = filtered.filter((log) => log.fare >= minFare);
+      // Filter to rides with fare >= minFare
+      filtered = filtered.filter(log => log.estimatedEarnings >= minFare);
+      // Sort by absolute difference (closest to searched fare first)
+      filtered.sort((a, b) =>
+        Math.abs(a.estimatedEarnings - minFare) - Math.abs(b.estimatedEarnings - minFare)
+      );
+    } else {
+      // If no minFare filter, sort by endedAt descending
+      filtered.sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime());
     }
 
     setFilteredLogs(filtered);
     setIsFilterOpen(false);
   };
 
+  // Clear all filters and reset list
   const handleClearFilters = () => {
     setStartDate(null);
     setEndDate(null);
     setPickupLocation('');
     setDropoffLocation('');
     setMinFare(null);
-    setFilteredLogs(logs);
+    // Reset filters and sort by endedAt descending
+    const sortedLogs = [...logs].sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime());
+    setFilteredLogs(sortedLogs);
     setIsFilterOpen(false);
   };
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 max-w-2xl mx-auto min-h-screen bg-gray-900 text-white">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Ride History</h2>
         <Button onClick={() => setIsFilterOpen(true)} className="gap-2">
@@ -115,7 +148,7 @@ export default function History() {
       {filteredLogs.length === 0 ? (
         <p className="text-center text-gray-400">No rides found.</p>
       ) : (
-        filteredLogs.map((log) => (
+        filteredLogs.map(log => (
           <RideHistoryCard key={log.id} log={log} />
         ))
       )}
@@ -129,8 +162,6 @@ export default function History() {
         setStartDate={setStartDate}
         endDate={endDate}
         setEndDate={setEndDate}
-        pickupLocation={pickupLocation}
-        setPickupLocation={setPickupLocation}
         dropoffLocation={dropoffLocation}
         setDropoffLocation={setDropoffLocation}
         minFare={minFare}

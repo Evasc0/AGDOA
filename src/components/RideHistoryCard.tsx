@@ -3,37 +3,49 @@ import React from 'react';
 
 interface RideLog {
   id: string;
-  timestamp: Date;
-  duration: number;
-  distance: number;
-  pickup: string;
-  dropoff: string;
-  fare: number;
-  lastTurningPoint?: string;
+  driverId: string;
+  dropoffLocation: {
+    lat: number;
+    lng: number;
+  };
+  dropoffName: string;
+  endedAt: Date; // This will be the timestamp for when the ride ended
+  estimatedEarnings: number;
+  pickupLocation: {
+    lat: number;
+    lng: number;
+  };
+  plateNumber: string;
+  startedAt: Date; // This will be the timestamp for when the ride started
+  travelTimeMinutes: number;
+  waitTimeMinutes: number;
 }
 
-interface RideHistoryCardProps {
+interface Props {
   log: RideLog;
 }
 
-export default function RideHistoryCard({ log }: RideHistoryCardProps) {
+const RideHistoryCard: React.FC<Props> = ({ log }) => {
   return (
-    <div className="bg-gray-800 p-4 rounded-xl mb-4 shadow">
-      <div className="text-sm text-gray-400">
-        {log.timestamp.toLocaleString()}
-      </div>
-      <div className="mt-1 text-base font-semibold">
-        {log.pickup} → {log.dropoff}
-      </div>
-      {log.lastTurningPoint && (
-        <div className="text-xs text-yellow-300 mt-1 italic">
-          Last Turn: {log.lastTurningPoint}
-        </div>
-      )}
-      <div className="text-sm mt-1">
-        Distance: {log.distance} km · Duration: {log.duration} mins
-      </div>
-      <div className="text-green-400 font-bold mt-1">₱{log.fare}</div>
+    <div className="bg-gray-700 p-4 rounded-lg mb-4 shadow-md">
+      {/* Destination name */}
+      <p className="text-lg font-semibold mb-1">{log.dropoffName}</p>
+
+      {/* Date and time */}
+      <p className="text-gray-400 text-sm mb-2">
+        Ended at: {log.endedAt.toLocaleString()}
+      </p>
+
+      {/* Distance and Duration formatted */}
+      <p className="mb-1">
+        Distance: {log.travelTimeMinutes > 0 ? log.travelTimeMinutes : 0} km &middot; Duration: {log.travelTimeMinutes} mins
+      </p>
+
+    
+      {/* Fare */}
+      <p className="font-semibold mt-2">Earnings: ₱{log.estimatedEarnings}</p>
     </div>
   );
-}
+};
+
+export default RideHistoryCard;

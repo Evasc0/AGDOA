@@ -1,3 +1,4 @@
+// src/components/RideHistoryFilterModal.tsx
 import React from 'react';
 
 interface Props {
@@ -9,8 +10,6 @@ interface Props {
   setStartDate: (date: Date | null) => void;
   endDate: Date | null;
   setEndDate: (date: Date | null) => void;
-  pickupLocation: string;
-  setPickupLocation: (value: string) => void;
   dropoffLocation: string;
   setDropoffLocation: (value: string) => void;
   minFare: number | null;
@@ -26,8 +25,6 @@ const RideHistoryFilterModal: React.FC<Props> = ({
   setStartDate,
   endDate,
   setEndDate,
-  pickupLocation,
-  setPickupLocation,
   dropoffLocation,
   setDropoffLocation,
   minFare,
@@ -108,17 +105,6 @@ const RideHistoryFilterModal: React.FC<Props> = ({
               onChange={(e) =>
                 setEndDate(e.target.value ? new Date(e.target.value) : null)
               }
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm mb-1">Pickup Location</label>
-            <input
-              type="text"
-              placeholder="e.g., Caliking"
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
-              value={pickupLocation}
-              onChange={(e) => setPickupLocation(e.target.value)}
             />
           </div>
 
