@@ -121,4 +121,5 @@ const App = () => {
   );
 };
 
+// Export the App component as default
 export default App;
