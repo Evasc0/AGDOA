@@ -1,4 +1,3 @@
-// src/pages/Profile.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
@@ -40,7 +39,7 @@ const Profile = () => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setDriver(data);
-        setStatus(data.status || "");
+        setStatus(data.status || "Offline"); // Default to Offline
         setAge(data.age || "");
         setContact(data.contact || "");
         setImage(data.image || null);
@@ -93,6 +92,10 @@ const Profile = () => {
     }
   };
 
+  const toggleStatus = () => {
+    setStatus((prevStatus) => (prevStatus === "Online" ? "Offline" : "Online"));
+  };
+
   if (!driver) return null;
 
   const profileUrl = `${window.location.origin}/driver/${user?.uid}`;
@@ -140,12 +143,24 @@ const Profile = () => {
               <div>
                 <strong>Status:</strong>{" "}
                 {editing ? (
-                  <input
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="bg-gray-700 rounded p-1 ml-2 w-full"
-                  />
-                ) : status}
+                  <div className="flex items-center">
+                    <span
+                      className={`inline-block w-10 h-6 rounded-full ${
+                        status === "Online" ? "bg-green-500" : "bg-red-500"
+                      } cursor-pointer`}
+                      onClick={toggleStatus}
+                    >
+                      <span
+                        className={`block w-4 h-4 bg-white rounded-full transition-transform ${
+                          status === "Online" ? "translate-x-4" : ""
+                        }`}
+                      ></span>
+                    </span>
+                    <span className="ml-2 text-sm">{status}</span>
+                  </div>
+                ) : (
+                  status
+                )}
               </div>
 
               <div>
@@ -156,7 +171,9 @@ const Profile = () => {
                     onChange={(e) => setAge(e.target.value)}
                     className="bg-gray-700 rounded p-1 ml-2 w-full"
                   />
-                ) : age}
+                ) : (
+                  age
+                )}
               </div>
 
               <div>
@@ -167,7 +184,9 @@ const Profile = () => {
                     onChange={(e) => setContact(e.target.value)}
                     className="bg-gray-700 rounded p-1 ml-2 w-full"
                   />
-                ) : contact}
+                ) : (
+                  contact
+                )}
               </div>
 
               <div>
@@ -181,7 +200,9 @@ const Profile = () => {
                     <option value="GCash">GCash</option>
                     <option value="PayMaya">PayMaya</option>
                   </select>
-                ) : paymentMethod}
+                ) : (
+                  paymentMethod
+                )}
               </div>
 
               <div>
@@ -192,7 +213,9 @@ const Profile = () => {
                     onChange={(e) => setPaymentNumber(e.target.value)}
                     className="bg-gray-700 rounded p-1 ml-2 w-full"
                   />
-                ) : paymentNumber || "N/A"}
+                ) : (
+                  paymentNumber || "N/A"
+                )}
               </div>
             </div>
 
