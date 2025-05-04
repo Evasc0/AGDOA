@@ -93,11 +93,13 @@ const Analytics: React.FC = () => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7); // Get the date 7 days ago
 
       const q = query(
         collection(db, 'ride_logs'),
         where('driverId', '==', user.uid),
-        where('timestamp', '>=', Timestamp.fromDate(today))
+        where('timestamp', '>=', Timestamp.fromDate(sevenDaysAgo)) // Fetch rides from the last 7 days
       );
 
       const snapshot = await getDocs(q);
@@ -108,18 +110,21 @@ const Analytics: React.FC = () => {
       let dropoffs: Record<string, { count: number; earnings: number }> = {};
       let statMap: Record<string, { earnings: number; rides: number }> = {};
 
-      for (let i = 0 ; i < 7; i++) {
-        const d = new Date(today.getTime() - i * 86400000);
+      // Initialize statMap for the last 7 days
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(sevenDaysAgo.getTime() + i * 86400000);
         const label = d.toLocaleDateString(undefined, { weekday: 'short' });
         statMap[label] = { earnings: 0, rides: 0 };
       }
+
+      // Variables to track today's rides and earnings
+      let todayEarnings = 0;
+      let todayRidesCount = 0;
 
       snapshot.forEach(doc => {
         const data = doc.data();
         const ts = data.timestamp?.toDate();
         if (!ts) return;
-
-        const dayLabel = ts.toLocaleDateString(undefined, { weekday: 'short' });
 
         const dropoffNameRaw = data.dropoffName || "";
         const dropoffName = dropoffNameRaw.trim();
@@ -131,18 +136,27 @@ const Analytics: React.FC = () => {
 
         const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
 
-        totalEarnings += fare;
+        totalEarnings += fare; // Accumulate total earnings for the last 7 days
 
+        // Check if the ride is today
+        if (ts >= today && ts < new Date(today.getTime() + 86400000)) {
+          todayEarnings += fare; // Accumulate today's earnings
+          todayRidesCount++; // Count today's rides
+        }
+
+        // Update wait time
         if (typeof data.waitTimeMinutes === "number" && data.waitTimeMinutes >= 0) {
           totalWaitTime += data.waitTimeMinutes;
           ridesWithWaitTimeCount++;
         }
 
+        const dayLabel = ts.toLocaleDateString(undefined, { weekday: 'short' });
         statMap[dayLabel] = {
           earnings: (statMap[dayLabel]?.earnings || 0) + fare,
           rides: (statMap[dayLabel]?.rides || 0) + 1,
         };
 
+        // Update drop-off statistics
         if (dropoffName) {
           if (!dropoffs[dropoffName]) {
             dropoffs[dropoffName] = { count: 0, earnings: 0 };
@@ -152,13 +166,19 @@ const Analytics: React.FC = () => {
         }
       });
 
-      setRidesToday(snapshot.size);
+      // Set today's rides and earnings
+      setRidesToday(todayRidesCount);
+      setEarnings(todayEarnings);
+      
+      // Calculate average wait time for the past 7 days
       setAvgWaitTime(
         ridesWithWaitTimeCount ? Math.round(totalWaitTime / ridesWithWaitTimeCount) : 0
       );
-      setEarnings(totalEarnings);
+
+      // Set drop-off areas
       setDropoffAreas(dropoffs);
 
+      // Set daily stats for the 7-day trend
       setDailyStats(
         Object.entries(statMap)
           .reverse()
@@ -197,7 +217,7 @@ const Analytics: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8 ">
         <div className="bg-gray-800 p-5 rounded-lg text-center">
           <div className=" text-3xl">🕒</div>
           <p className="mt-2 font-semibold text-lg">Avg Wait Time</p>
