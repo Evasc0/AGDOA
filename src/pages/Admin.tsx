@@ -1,4 +1,3 @@
-// src/pages/Admin.tsx
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -15,9 +14,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import {
-  createUserWithEmailAndPassword,
   getAuth,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
 } from "firebase/auth";
@@ -65,9 +62,19 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
   };
 
   return (
-    <li ref={setNodeRef} style={style} {...attributes} {...listeners} className="flex justify-between items-center bg-gray-700 p-2 rounded cursor-move">
-      <span>{name} ({plate})</span>
-      <button onClick={() => onRemove(id)} className="text-red-400">Remove</button>
+    <li
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="flex justify-between items-center bg-gray-700 p-2 rounded cursor-move"
+    >
+      <span>
+        {name} ({plate})
+      </span>
+      <button onClick={() => onRemove(id)} className="text-red-400">
+        Remove
+      </button>
     </li>
   );
 };
@@ -81,7 +88,7 @@ const Admin = () => {
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"drivers" | "logs" | "queue">("drivers");
+  const [tab, setTab] = useState<"drivers" | "logs" | "queue" | "history">("drivers");
 
   const [newDriver, setNewDriver] = useState({ email: "", password: "", name: "", plate: "" });
   const [showModal, setShowModal] = useState(false);
@@ -105,7 +112,7 @@ const Admin = () => {
       unsubQueue();
       unsubLogs();
     };
-  }, []);
+  }, [db]);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -131,12 +138,10 @@ const Admin = () => {
     const { email, password, name, plate } = newDriver;
     if (!email || !password || !name || !plate) return toast.error("Fill all fields");
 
+    // Since we are NOT creating Firebase auth user here, password is ignored
     try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(userCred.user);
-
+      // Add driver document to Firestore only
       await addDoc(collection(db, "drivers"), {
-        id: userCred.user.uid,
         name,
         plate,
         email,
@@ -144,7 +149,8 @@ const Admin = () => {
         createdAt: serverTimestamp(),
       });
 
-      toast.success("Driver registered & verification sent");
+      toast.success("Driver registered successfully");
+
       setNewDriver({ email: "", password: "", name: "", plate: "" });
     } catch (err: any) {
       toast.error(err.message);
@@ -228,6 +234,7 @@ const Admin = () => {
   };
 
   const formatTime = (seconds: number) => {
+    if (!seconds) return "No date";
     const date = new Date(seconds * 1000);
     return date.toLocaleString();
   };
@@ -237,7 +244,7 @@ const Admin = () => {
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold">Admin Panel</h1>
         <div className="flex gap-2 items-center">
-          {["drivers", "queue", "logs"].map((type) => (
+          {["drivers", "queue", "logs", "history"].map((type) => (
             <button
               key={type}
               onClick={() => setTab(type as any)}
@@ -246,7 +253,9 @@ const Admin = () => {
               {type[0].toUpperCase() + type.slice(1)}
             </button>
           ))}
-          <button onClick={handleLogout} className="px-3 py-2 rounded bg-red-600">Logout</button>
+          <button onClick={handleLogout} className="px-3 py-2 rounded bg-red-600">
+            Logout
+          </button>
         </div>
       </div>
 
@@ -280,11 +289,27 @@ const Admin = () => {
                     <td>{driver.status}</td>
                     <td>{driver.email}</td>
                     <td className="space-x-2 text-right pr-4">
-                      <button onClick={() => { setSelectedDriver(driver); setShowModal(true); }} className="text-blue-400">Edit</button>
-                      <button onClick={() => handleDelete(driver.id)} className="text-red-400">Delete</button>
-                      <button onClick={() => toggleStatus(driver.id, driver.status)} className="text-yellow-400">Toggle</button>
-                      <button onClick={() => resetPassword(driver.email)} className="text-purple-400">Reset</button>
-                      <button onClick={() => addToQueue(driver)} className="text-green-400">Add to Queue</button>
+                      <button
+                        onClick={() => {
+                          setSelectedDriver(driver);
+                          setShowModal(true);
+                        }}
+                        className="text-blue-400"
+                      >
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(driver.id)} className="text-red-400">
+                        Delete
+                      </button>
+                      <button onClick={() => toggleStatus(driver.id, driver.status)} className="text-yellow-400">
+                        Toggle
+                      </button>
+                      <button onClick={() => resetPassword(driver.email)} className="text-purple-400">
+                        Reset
+                      </button>
+                      <button onClick={() => addToQueue(driver)} className="text-green-400">
+                        Add to Queue
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -306,7 +331,9 @@ const Admin = () => {
                 />
               ))}
             </div>
-            <button onClick={handleRegister} className="mt-2 px-4 py-2 bg-blue-600 rounded">Register</button>
+            <button onClick={handleRegister} className="mt-2 px-4 py-2 bg-blue-600 rounded">
+              Register
+            </button>
           </div>
         </>
       )}
@@ -319,13 +346,7 @@ const Admin = () => {
             <SortableContext items={queue.map((q) => q.driverId)} strategy={verticalListSortingStrategy}>
               <ul className="space-y-2 max-h-[400px] overflow-y-auto">
                 {queue.map((entry) => (
-                  <SortableItem
-                    key={entry.driverId}
-                    id={entry.driverId}
-                    name={entry.name}
-                    plate={entry.plate}
-                    onRemove={removeFromQueue}
-                  />
+                  <SortableItem key={entry.driverId} id={entry.driverId} name={entry.name} plate={entry.plate} onRemove={removeFromQueue} />
                 ))}
               </ul>
             </SortableContext>
@@ -336,8 +357,12 @@ const Admin = () => {
             <ul className="space-y-1 text-sm">
               {onlineNotInQueue.map((d) => (
                 <li key={d.id} className="flex justify-between items-center bg-gray-700 p-2 rounded">
-                  <span>{d.name} ({d.plate})</span>
-                  <button onClick={() => addToQueue(d)} className="text-green-400">Add</button>
+                  <span>
+                    {d.name} ({d.plate})
+                  </span>
+                  <button onClick={() => addToQueue(d)} className="text-green-400">
+                    Add
+                  </button>
                 </li>
               ))}
               {onlineNotInQueue.length === 0 && <li className="text-gray-400 italic">None</li>}
@@ -355,9 +380,24 @@ const Admin = () => {
               <div key={log.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
                   <strong>{log.email}</strong> —{" "}
-                  {log.accessedAt?.seconds
-                    ? formatTime(log.accessedAt.seconds)
-                    : "No time"}
+                  {log.accessedAt?.seconds ? formatTime(log.accessedAt.seconds) : "No time"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* DRIVER HISTORY */}
+      {tab === "history" && (
+        <div className="mt-4 bg-gray-800 p-4 rounded">
+          <h2 className="text-lg font-bold mb-2">Driver History</h2>
+          <div className="overflow-y-auto max-h-[400px] space-y-2">
+            {drivers.map((driver) => (
+              <div key={driver.id} className="border-b border-gray-600 py-1">
+                <p className="text-sm">
+                  <strong>{driver.name}</strong> — {driver.plate} — {driver.status} — Registered on:{" "}
+                  {formatTime(driver.createdAt?.seconds)}
                 </p>
               </div>
             ))}
@@ -366,14 +406,11 @@ const Admin = () => {
       )}
 
       {showModal && selectedDriver && (
-        <EditDriverModal
-          driver={selectedDriver}
-          onClose={() => setShowModal(false)}
-          onSaveSuccess={() => setShowModal(false)}
-        />
+        <EditDriverModal driver={selectedDriver} onClose={() => setShowModal(false)} onSaveSuccess={() => setShowModal(false)} />
       )}
     </div>
   );
 };
 
 export default Admin;
+
