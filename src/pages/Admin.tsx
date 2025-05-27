@@ -5,7 +5,6 @@ import {
   onSnapshot,
   doc,
   deleteDoc,
-  updateDoc,
   addDoc,
   serverTimestamp,
   query,
@@ -43,7 +42,7 @@ interface Driver {
   name: string;
   plate: string;
   email: string;
-  status: "online" | "offline";
+  status: "online" | "offline"; // kept for completeness but no longer toggled manually
   createdAt?: any;
 }
 
@@ -130,7 +129,7 @@ const Admin = () => {
       }
     );
 
-    // Listen to queues collection, ordered by 'order' field or fallback to 'joinedAt'
+    // Listen to queues collection, ordered by 'joinedAt' field
     const queueQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
     const unsubQueue = onSnapshot(
       queueQuery,
@@ -199,7 +198,7 @@ const Admin = () => {
     }
   };
 
-  // Register new driver (adds document in drivers collection)
+  // Register new driver
   const handleRegister = async () => {
     const { email, password, name, plate } = newDriver;
     if (!email || !password || !name || !plate) {
@@ -227,21 +226,7 @@ const Admin = () => {
       await deleteDoc(doc(db, "drivers", id));
       toast.success("Driver deleted");
     } catch (error: any) {
-      console.error("Error deleting driver:", error);
       toast.error("Error deleting driver");
-    }
-  };
-
-  // Toggle driver status online/offline
-  const toggleStatus = async (id: string, current: string) => {
-    try {
-      await updateDoc(doc(db, "drivers", id), {
-        status: current === "online" ? "offline" : "online",
-      });
-      toast.success("Status updated");
-    } catch (error: any) {
-      console.error("Error updating status:", error);
-      toast.error("Error updating status");
     }
   };
 
@@ -251,25 +236,22 @@ const Admin = () => {
       await sendPasswordResetEmail(auth, email);
       toast.success("Password reset email sent");
     } catch (error: any) {
-      console.error("Error sending reset email:", error);
       toast.error("Error sending reset email");
     }
   };
 
   // Add driver to queue, set order to last position
   const addToQueue = async (driver: Driver) => {
-    console.log("Adding to queue:", driver); // Debug: Log driver being added
     try {
       await setDoc(doc(db, "queues", driver.id), {
         driverId: driver.id,
         name: driver.name,
         plate: driver.plate,
         joinedAt: serverTimestamp(),
-        order: queue.length, // Add at the end of queue
+        order: queue.length,
       });
       toast.success(`${driver.name} added to queue`);
     } catch (error: any) {
-      console.error("Error adding to queue:", error); // Debug: Log error
       toast.error("Failed to add to queue: " + error.message);
     }
   };
@@ -280,7 +262,6 @@ const Admin = () => {
       await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
     } catch (error: any) {
-      console.error("Failed to remove from queue:", error);
       toast.error("Failed to remove from queue: " + error.message);
     }
   };
@@ -292,9 +273,18 @@ const Admin = () => {
       d.plate?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Online drivers not currently in queue
+  // Helper: Determine driver status based on presence in queue
+  const getDriverStatus = (driverId: string) => {
+    if (queue.find((q) => q.driverId === driverId)) {
+      return "Waiting";
+    }
+    // TODO: To implement 'In Ride' detection, you can add logic here if you track active rides in Firestore.
+    return "Offline";
+  };
+
+  // Online drivers not currently in queue (used only for queue tab)
   const onlineNotInQueue = drivers.filter(
-    (d) => d.status === "online" && !queue.find((q) => q.driverId === d.id)
+    (d) => !queue.find((q) => q.driverId === d.id)
   );
 
   const handleLogout = async () => {
@@ -303,7 +293,6 @@ const Admin = () => {
       toast.success("Logged out");
       navigate("/login");
     } catch (error: any) {
-      console.error("Logout failed:", error);
       toast.error("Logout failed");
     }
   };
@@ -324,7 +313,9 @@ const Admin = () => {
             <button
               key={type}
               onClick={() => setTab(type as any)}
-              className={`px-3 py-2 rounded ${tab === type ? "bg-blue-600" : "bg-gray-700"}`}
+              className={`px-3 py-2 rounded ${
+                tab === type ? "bg-blue-600" : "bg-gray-700"
+              }`}
             >
               {type[0].toUpperCase() + type.slice(1)}
             </button>
@@ -362,7 +353,7 @@ const Admin = () => {
                   <tr key={driver.id} className="border-t border-gray-600">
                     <td className="p-2">{driver.name}</td>
                     <td>{driver.plate}</td>
-                    <td>{driver.status}</td>
+                    <td>{getDriverStatus(driver.id)}</td>
                     <td>{driver.email}</td>
                     <td className="space-x-2 text-right pr-4">
                       <button
@@ -374,16 +365,22 @@ const Admin = () => {
                       >
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(driver.id)} className="text-red-400">
+                      <button
+                        onClick={() => handleDelete(driver.id)}
+                        className="text-red-400"
+                      >
                         Delete
                       </button>
-                      <button onClick={() => toggleStatus(driver.id, driver.status)} className="text-yellow-400">
-                        Toggle
-                      </button>
-                      <button onClick={() => resetPassword(driver.email)} className="text-purple-400">
+                      <button
+                        onClick={() => resetPassword(driver.email)}
+                        className="text-purple-400"
+                      >
                         Reset
                       </button>
-                      <button onClick={() => addToQueue(driver)} className="text-green-400">
+                      <button
+                        onClick={() => addToQueue(driver)}
+                        className="text-green-400"
+                      >
                         Add to Queue
                       </button>
                     </td>
@@ -393,88 +390,98 @@ const Admin = () => {
             </table>
           </div>
 
+          {/* Driver Status Section */}
           <div className="mt-6 bg-gray-800 p-4 rounded">
-            <h2 className="text-lg font-bold mb-2">Register New Driver</h2>
-            <div className="grid md:grid-cols-4 gap-2">
-              {["name", "plate", "email", "password"].map((field) => (
-                <input
-                  key={field}
-                  type={field === "password" ? "password" : "text"}
-                  placeholder={field[0].toUpperCase() + field.slice(1)}
-                  value={(newDriver as any)[field]}
-                  onChange={(e) => setNewDriver({ ...newDriver, [field]: e.target.value })}
-                  className="p-2 text-black rounded"
-                />
+            <h2 className="text-lg font-bold mb-2">Driver Status</h2>
+            <ul className="space-y-2">
+              {drivers.map((driver) => (
+                <li
+                  key={driver.id}
+                  className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                >
+                  <span>
+                    {driver.name} ({driver.plate}) -{" "}
+                    <span
+                      className={`font-semibold ${
+                        getDriverStatus(driver.id) === "Waiting"
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {getDriverStatus(driver.id)}
+                    </span>
+                  </span>
+                </li>
               ))}
-            </div>
-            <button onClick={handleRegister} className="mt-2 px-4 py-2 bg-blue-600 rounded">
-              Register
-            </button>
+            </ul>
           </div>
         </>
       )}
 
       {/* QUEUE */}
       {tab === "queue" && (
-  <div className="bg-gray-800 p-4 rounded mt-4">
-    <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={queue.map((q) => q.driverId)} strategy={verticalListSortingStrategy}>
-        <ul className="space-y-2 max-h-[400px] overflow-y-auto">
-          {queue.map((entry) => {
-            // Find the driver data corresponding to this queue entry
-            const driver = drivers.find((d) => d.id === entry.driverId);
-            const status = driver?.status || "offline";
-            // Optional: If you track "in ride" status differently, adjust status here
-
-
-            return (
-              <SortableItem
-                key={entry.driverId}
-                id={entry.driverId}
-                name={driver?.name ?? entry.name}
-                plate={driver?.plate ?? entry.plate}
-                onRemove={removeFromQueue}
-              >
-                <span
-                  className={`ml-4 text-sm font-medium ${
-                    status === "online" ? "text-green-400" : status === "offline" ? "text-red-400" : "text-yellow-400"
-                  }`}
-                >
-                  {status}
-                </span>
-              </SortableItem>
-            );
-          })}
-        </ul>
-      </SortableContext>
-    </DndContext>
-
-    <div className="mt-6">
-      <h3 className="text-md font-semibold mb-2">Online but not in queue:</h3>
-      <ul className="space-y-1 text-sm">
-        {onlineNotInQueue.length > 0 ? (
-          onlineNotInQueue.map((d) => (
-            <li
-              key={d.id}
-              className="flex justify-between items-center bg-gray-700 p-2 rounded"
+        <div className="bg-gray-800 p-4 rounded mt-4">
+          <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={queue.map((q) => q.driverId)}
+              strategy={verticalListSortingStrategy}
             >
-              <span>
-                {d.name} ({d.plate}) -{" "}
-                <span className="text-green-400 font-semibold">{d.status}</span>
-              </span>
-              <button onClick={() => addToQueue(d)} className="text-green-400">
-                Add
-              </button>
-            </li>
-          ))
-        ) : (
-          <li className="text-gray-400 italic">None</li>
-        )}
-      </ul>
-    </div>
-  </div>
-)}
+              <ul className="space-y-2 max-h-[400px] overflow-y-auto">
+                {queue.map((entry) => {
+                  // Find the driver data corresponding to this queue entry
+                  const driver = drivers.find((d) => d.id === entry.driverId);
+                  const status = getDriverStatus(entry.driverId);
+
+                  return (
+                    <SortableItem
+                      key={entry.driverId}
+                      id={entry.driverId}
+                      name={driver?.name ?? entry.name}
+                      plate={driver?.plate ?? entry.plate}
+                      onRemove={removeFromQueue}
+                    >
+                      <span
+                        className={`ml-4 text-sm font-medium ${
+                          status === "Waiting"
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {status}
+                      </span>
+                    </SortableItem>
+                  );
+                })}
+              </ul>
+            </SortableContext>
+          </DndContext>
+
+          <div className="mt-6">
+            <h3 className="text-md font-semibold mb-2">Drivers not in queue:</h3>
+            <ul className="space-y-1 text-sm">
+              {onlineNotInQueue.length > 0 ? (
+                onlineNotInQueue.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                  >
+                    <span>
+                      {d.name} ({d.plate}) -{" "}
+                      <span className="text-red-400 font-semibold">Offline</span>
+                    </span>
+                    <button onClick={() => addToQueue(d)} className="text-green-400">
+                      Add
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-gray-400 italic">None</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* LOGS */}
       {tab === "logs" && (
@@ -501,7 +508,7 @@ const Admin = () => {
             {drivers.map((driver) => (
               <div key={driver.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
-                  <strong>{driver.name}</strong> — {driver.plate} — {driver.status} — Registered on:{" "}
+                  <strong>{driver.name}</strong> — {driver.plate} — Registered on:{" "}
                   {formatTime(driver.createdAt?.seconds)}
                 </p>
               </div>
@@ -522,3 +529,4 @@ const Admin = () => {
 };
 
 export default Admin;
+
