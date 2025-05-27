@@ -17,6 +17,7 @@ import {
   getAuth,
   sendPasswordResetEmail,
   signOut,
+  onAuthStateChanged,
 } from "firebase/auth";
 import toast from "react-hot-toast";
 import EditDriverModal from "../components/EditDriverModal";
@@ -51,6 +52,8 @@ interface QueueEntry {
   name: string;
   plate: string;
   joinedAt?: any;
+  order?: number;
+  id?: string;
 }
 
 const SortableItem = ({ id, name, plate, onRemove }: any) => {
@@ -84,6 +87,7 @@ const Admin = () => {
   const auth = getAuth();
   const navigate = useNavigate();
 
+  const [user, setUser ] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -94,53 +98,115 @@ const Admin = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
+  // Monitor authentication status
   useEffect(() => {
-    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snap) => {
-      setDrivers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Driver)));
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser ) => {
+      if (currentUser ) {
+        setUser (currentUser );
+      } else {
+        navigate("/login");
+      }
     });
+    return () => unsubscribeAuth();
+  }, [auth, navigate]);
 
-    const unsubQueue = onSnapshot(query(collection(db, "queue"), orderBy("joinedAt")), (snap) => {
-      setQueue(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as unknown as QueueEntry)));
-    });
+  // Fetch drivers, queue, and logs from Firestore when user is authenticated
+  useEffect(() => {
+    if (!user) return;
 
-    const unsubLogs = onSnapshot(collection(db, "adminAccessLogs"), (snap) => {
-      setLogs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
+    // Listen to drivers collection
+    const unsubDrivers = onSnapshot(
+      collection(db, "drivers"),
+      (snap) => {
+        setDrivers(
+          snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          } as Driver))
+        );
+      },
+      (error) => {
+        toast.error("Error fetching drivers: " + error.message);
+      }
+    );
+
+    // Listen to queues collection, ordered by 'order' field or fallback to 'joinedAt'
+    const queueQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
+    const unsubQueue = onSnapshot(
+      queueQuery,
+      (snap) => {
+        setQueue(
+          snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          } as QueueEntry))
+        );
+      },
+      (error) => {
+        toast.error("Error fetching queue: " + error.message);
+      }
+    );
+
+    // Listen to admin access logs
+    const unsubLogs = onSnapshot(
+      collection(db, "adminAccessLogs"),
+      (snap) => {
+        setLogs(
+          snap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
+      },
+      (error) => {
+        toast.error("Error fetching logs: " + error.message);
+      }
+    );
 
     return () => {
       unsubDrivers();
       unsubQueue();
       unsubLogs();
     };
-  }, [db]);
+  }, [db, user]);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
+  // Handle drag end to reorder queue
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
     const oldIndex = queue.findIndex((item) => item.driverId === active.id);
     const newIndex = queue.findIndex((item) => item.driverId === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
     const newQueue = arrayMove(queue, oldIndex, newIndex);
     setQueue(newQueue);
 
+    // Batch update 'order' field to preserve queue order in Firestore
     const batch = writeBatch(db);
     newQueue.forEach((item, index) => {
-      const ref = doc(db, "queue", item.driverId);
-      batch.update(ref, { joinedAt: serverTimestamp(), order: index });
+      const ref = doc(db, "queues", item.driverId);
+      batch.update(ref, { order: index });
     });
-    await batch.commit();
-    toast.success("Queue reordered");
+
+    try {
+      await batch.commit();
+      toast.success("Queue reordered successfully");
+    } catch (error: any) {
+      toast.error("Failed to reorder queue: " + error.message);
+    }
   };
 
+  // Register new driver (adds document in drivers collection)
   const handleRegister = async () => {
     const { email, password, name, plate } = newDriver;
-    if (!email || !password || !name || !plate) return toast.error("Fill all fields");
-
-    // Since we are NOT creating Firebase auth user here, password is ignored
+    if (!email || !password || !name || !plate) {
+      toast.error("Please fill all fields");
+      return;
+    }
     try {
-      // Add driver document to Firestore only
       await addDoc(collection(db, "drivers"), {
         name,
         plate,
@@ -148,77 +214,85 @@ const Admin = () => {
         status: "offline",
         createdAt: serverTimestamp(),
       });
-
       toast.success("Driver registered successfully");
-
       setNewDriver({ email: "", password: "", name: "", plate: "" });
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error("Failed to register driver: " + err.message);
     }
   };
 
+  // Delete driver document
   const handleDelete = async (id: string) => {
     try {
       await deleteDoc(doc(db, "drivers", id));
       toast.success("Driver deleted");
-    } catch {
+    } catch (error: any) {
+      console.error("Error deleting driver:", error);
       toast.error("Error deleting driver");
     }
   };
 
+  // Toggle driver status online/offline
   const toggleStatus = async (id: string, current: string) => {
     try {
       await updateDoc(doc(db, "drivers", id), {
         status: current === "online" ? "offline" : "online",
       });
       toast.success("Status updated");
-    } catch {
+    } catch (error: any) {
+      console.error("Error updating status:", error);
       toast.error("Error updating status");
     }
   };
 
+  // Reset password email
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
       toast.success("Password reset email sent");
-    } catch {
+    } catch (error: any) {
+      console.error("Error sending reset email:", error);
       toast.error("Error sending reset email");
     }
   };
 
-  const resendVerification = async () => {
-    toast.error("Client SDK can't resend verification. Use Admin SDK.");
-  };
-
+  // Add driver to queue, set order to last position
   const addToQueue = async (driver: Driver) => {
+    console.log("Adding to queue:", driver); // Debug: Log driver being added
     try {
-      await setDoc(doc(db, "queue", driver.id), {
+      await setDoc(doc(db, "queues", driver.id), {
         driverId: driver.id,
         name: driver.name,
         plate: driver.plate,
         joinedAt: serverTimestamp(),
+        order: queue.length, // Add at the end of queue
       });
       toast.success(`${driver.name} added to queue`);
-    } catch {
-      toast.error("Failed to add to queue");
+    } catch (error: any) {
+      console.error("Error adding to queue:", error); // Debug: Log error
+      toast.error("Failed to add to queue: " + error.message);
     }
   };
 
+  // Remove driver from queue
   const removeFromQueue = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "queue", id));
+      await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
-    } catch {
-      toast.error("Failed to remove from queue");
+    } catch (error: any) {
+      console.error("Failed to remove from queue:", error);
+      toast.error("Failed to remove from queue: " + error.message);
     }
   };
 
+  // Filter drivers for search
   const filteredDrivers = drivers.filter(
     (d) =>
       d.name?.toLowerCase().includes(search.toLowerCase()) ||
       d.plate?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Online drivers not currently in queue
   const onlineNotInQueue = drivers.filter(
     (d) => d.status === "online" && !queue.find((q) => q.driverId === d.id)
   );
@@ -228,11 +302,13 @@ const Admin = () => {
       await signOut(auth);
       toast.success("Logged out");
       navigate("/login");
-    } catch {
+    } catch (error: any) {
+      console.error("Logout failed:", error);
       toast.error("Logout failed");
     }
   };
 
+  // Format Firestore timestamp to readable string
   const formatTime = (seconds: number) => {
     if (!seconds) return "No date";
     const date = new Date(seconds * 1000);
@@ -259,7 +335,7 @@ const Admin = () => {
         </div>
       </div>
 
-      {/* DRIVERS */}
+      {/* DRIVERS LIST */}
       {tab === "drivers" && (
         <>
           <input
@@ -340,36 +416,65 @@ const Admin = () => {
 
       {/* QUEUE */}
       {tab === "queue" && (
-        <div className="bg-gray-800 p-4 rounded mt-4">
-          <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={queue.map((q) => q.driverId)} strategy={verticalListSortingStrategy}>
-              <ul className="space-y-2 max-h-[400px] overflow-y-auto">
-                {queue.map((entry) => (
-                  <SortableItem key={entry.driverId} id={entry.driverId} name={entry.name} plate={entry.plate} onRemove={removeFromQueue} />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
+  <div className="bg-gray-800 p-4 rounded mt-4">
+    <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={queue.map((q) => q.driverId)} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-2 max-h-[400px] overflow-y-auto">
+          {queue.map((entry) => {
+            // Find the driver data corresponding to this queue entry
+            const driver = drivers.find((d) => d.id === entry.driverId);
+            const status = driver?.status || "offline";
+            // Optional: If you track "in ride" status differently, adjust status here
 
-          <div className="mt-6">
-            <h3 className="text-md font-semibold mb-2">Online but not in queue:</h3>
-            <ul className="space-y-1 text-sm">
-              {onlineNotInQueue.map((d) => (
-                <li key={d.id} className="flex justify-between items-center bg-gray-700 p-2 rounded">
-                  <span>
-                    {d.name} ({d.plate})
-                  </span>
-                  <button onClick={() => addToQueue(d)} className="text-green-400">
-                    Add
-                  </button>
-                </li>
-              ))}
-              {onlineNotInQueue.length === 0 && <li className="text-gray-400 italic">None</li>}
-            </ul>
-          </div>
-        </div>
-      )}
+
+            return (
+              <SortableItem
+                key={entry.driverId}
+                id={entry.driverId}
+                name={driver?.name ?? entry.name}
+                plate={driver?.plate ?? entry.plate}
+                onRemove={removeFromQueue}
+              >
+                <span
+                  className={`ml-4 text-sm font-medium ${
+                    status === "online" ? "text-green-400" : status === "offline" ? "text-red-400" : "text-yellow-400"
+                  }`}
+                >
+                  {status}
+                </span>
+              </SortableItem>
+            );
+          })}
+        </ul>
+      </SortableContext>
+    </DndContext>
+
+    <div className="mt-6">
+      <h3 className="text-md font-semibold mb-2">Online but not in queue:</h3>
+      <ul className="space-y-1 text-sm">
+        {onlineNotInQueue.length > 0 ? (
+          onlineNotInQueue.map((d) => (
+            <li
+              key={d.id}
+              className="flex justify-between items-center bg-gray-700 p-2 rounded"
+            >
+              <span>
+                {d.name} ({d.plate}) -{" "}
+                <span className="text-green-400 font-semibold">{d.status}</span>
+              </span>
+              <button onClick={() => addToQueue(d)} className="text-green-400">
+                Add
+              </button>
+            </li>
+          ))
+        ) : (
+          <li className="text-gray-400 italic">None</li>
+        )}
+      </ul>
+    </div>
+  </div>
+)}
 
       {/* LOGS */}
       {tab === "logs" && (
@@ -406,11 +511,14 @@ const Admin = () => {
       )}
 
       {showModal && selectedDriver && (
-        <EditDriverModal driver={selectedDriver} onClose={() => setShowModal(false)} onSaveSuccess={() => setShowModal(false)} />
+        <EditDriverModal
+          driver={selectedDriver}
+          onClose={() => setShowModal(false)}
+          onSaveSuccess={() => setShowModal(false)}
+        />
       )}
     </div>
   );
 };
 
 export default Admin;
-
