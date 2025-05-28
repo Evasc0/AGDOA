@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   collection,
   getFirestore,
@@ -42,7 +42,7 @@ interface Driver {
   name: string;
   plate: string;
   email: string;
-  status: "online" | "offline"; // kept for completeness but no longer toggled manually
+  status: "online" | "offline" | "in ride" | "waiting";
   createdAt?: any;
 }
 
@@ -97,6 +97,11 @@ const Admin = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
+  // Keep track of driverId timers to set offline after 1 min if they don't return to queue
+  const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Keep previous queue for comparison
+  const prevQueueDriverIds = useRef<Set<string>>(new Set());
+
   // Monitor authentication status
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser ) => {
@@ -109,7 +114,7 @@ const Admin = () => {
     return () => unsubscribeAuth();
   }, [auth, navigate]);
 
-  // Fetch drivers, queue, and logs from Firestore when user is authenticated
+  // Fetch drivers and logs, and handle queue with status logic
   useEffect(() => {
     if (!user) return;
 
@@ -133,13 +138,71 @@ const Admin = () => {
     const queueQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
     const unsubQueue = onSnapshot(
       queueQuery,
-      (snap) => {
-        setQueue(
-          snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          } as QueueEntry))
-        );
+      async (snap) => {
+        const currentQueue = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        } as QueueEntry));
+
+        setQueue(currentQueue);
+
+        // Get current queue driver ids as a Set
+        const currentDriverIds = new Set(currentQueue.map(q => q.driverId));
+        const previousDriverIds = prevQueueDriverIds.current;
+
+        // Detect drivers who left the queue (were in prev but not now)
+        const leftDrivers = Array.from(previousDriverIds).filter(id => !currentDriverIds.has(id));
+        // Detect drivers who joined or remain in queue (were not in prev or still in)
+        const joinedOrStayedDrivers = Array.from(currentDriverIds);
+
+        // Update status for drivers who just left queue to "in ride" and set offline timer
+        for (const driverId of leftDrivers) {
+          // Clear any existing timer for this driver
+          const existingTimer = offlineTimers.current.get(driverId);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+          }
+
+          // Update Firestore status to "in ride"
+          const driverRef = doc(db, "drivers", driverId);
+          try {
+            await setDoc(driverRef, { status: "in ride" }, { merge: true });
+          } catch (error: any) {
+            toast.error("Failed to update driver status to Left the queue (In Ride): " + error.message);
+          }
+
+          // Set timeout to automatically set status to offline after 1 minute
+          const timeout = setTimeout(async () => {
+            try {
+              await setDoc(driverRef, { status: "offline" }, { merge: true });
+              toast.success(`Driver ${driverId} status changed to Offline after 1 minute of leaving queue.`);
+            } catch (error: any) {
+              toast.error("Failed to update driver status to Offline: " + error.message);
+            }
+            offlineTimers.current.delete(driverId);
+          }, 60000); // 1 minute
+
+          offlineTimers.current.set(driverId, timeout);
+        }
+
+        // Update status for drivers who joined or stayed in queue to "waiting" and clear offline timers if any
+        for (const driverId of joinedOrStayedDrivers) {
+          const existingTimer = offlineTimers.current.get(driverId);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+            offlineTimers.current.delete(driverId);
+          }
+          // Set status to "waiting"
+          const driverRef = doc(db, "drivers", driverId);
+          try {
+            await setDoc(driverRef, { status: "waiting" }, { merge: true });
+          } catch (error: any) {
+            toast.error("Failed to update driver status to In Queue: " + error.message);
+          }
+        }
+
+        // Update previous queue driverIds
+        prevQueueDriverIds.current = currentDriverIds;
       },
       (error) => {
         toast.error("Error fetching queue: " + error.message);
@@ -166,6 +229,9 @@ const Admin = () => {
       unsubDrivers();
       unsubQueue();
       unsubLogs();
+      // Clear all timers on unmount
+      offlineTimers.current.forEach(timer => clearTimeout(timer));
+      offlineTimers.current.clear();
     };
   }, [db, user]);
 
@@ -256,11 +322,12 @@ const Admin = () => {
     }
   };
 
-  // Remove driver from queue
+  // Remove driver from queue (will be handled by queue listener logic)
   const removeFromQueue = async (id: string) => {
     try {
       await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
+      // No need to update status here, handled by the queue listener effect
     } catch (error: any) {
       toast.error("Failed to remove from queue: " + error.message);
     }
@@ -273,19 +340,15 @@ const Admin = () => {
       d.plate?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Helper: Determine driver status based on presence in queue
+  // Helper: Determine driver status string for display with new text
   const getDriverStatus = (driverId: string) => {
-    if (queue.find((q) => q.driverId === driverId)) {
-      return "Waiting";
-    }
-    // TODO: To implement 'In Ride' detection, you can add logic here if you track active rides in Firestore.
+    const driver = drivers.find((d) => d.id === driverId);
+    if (!driver) return "Offline";
+    if (driver.status === "waiting") return "In Queue";
+    if (driver.status === "in ride") return "Left the queue (In Ride)";
+    if (driver.status === "offline") return "Offline";
     return "Offline";
   };
-
-  // Online drivers not currently in queue (used only for queue tab)
-  const onlineNotInQueue = drivers.filter(
-    (d) => !queue.find((q) => q.driverId === d.id)
-  );
 
   const handleLogout = async () => {
     try {
@@ -403,9 +466,11 @@ const Admin = () => {
                     {driver.name} ({driver.plate}) -{" "}
                     <span
                       className={`font-semibold ${
-                        getDriverStatus(driver.id) === "Waiting"
+                        getDriverStatus(driver.id) === "In Queue"
                           ? "text-green-400"
-                          : "text-red-400"
+                          : getDriverStatus(driver.id) === "Left the queue (In Ride)"
+                            ? "text-yellow-400"
+                            : "text-red-400"
                       }`}
                     >
                       {getDriverStatus(driver.id)}
@@ -429,57 +494,34 @@ const Admin = () => {
             >
               <ul className="space-y-2 max-h-[400px] overflow-y-auto">
                 {queue.map((entry) => {
-                  // Find the driver data corresponding to this queue entry
                   const driver = drivers.find((d) => d.id === entry.driverId);
                   const status = getDriverStatus(entry.driverId);
 
                   return (
-                    <SortableItem
+                    <li
                       key={entry.driverId}
-                      id={entry.driverId}
-                      name={driver?.name ?? entry.name}
-                      plate={driver?.plate ?? entry.plate}
-                      onRemove={removeFromQueue}
+                      className="flex justify-between items-center bg-gray-700 p-2 rounded cursor-move"
                     >
+                      <span>
+                        {driver?.name ?? entry.name} ({driver?.plate ?? entry.plate})
+                      </span>
                       <span
                         className={`ml-4 text-sm font-medium ${
-                          status === "Waiting"
+                          status === "In Queue"
                             ? "text-green-400"
-                            : "text-red-400"
+                            : status === "Left the queue (In Ride)"
+                              ? "text-yellow-400"
+                              : "text-red-400"
                         }`}
                       >
                         {status}
                       </span>
-                    </SortableItem>
+                    </li>
                   );
                 })}
               </ul>
             </SortableContext>
           </DndContext>
-
-          <div className="mt-6">
-            <h3 className="text-md font-semibold mb-2">Drivers not in queue:</h3>
-            <ul className="space-y-1 text-sm">
-              {onlineNotInQueue.length > 0 ? (
-                onlineNotInQueue.map((d) => (
-                  <li
-                    key={d.id}
-                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
-                  >
-                    <span>
-                      {d.name} ({d.plate}) -{" "}
-                      <span className="text-red-400 font-semibold">Offline</span>
-                    </span>
-                    <button onClick={() => addToQueue(d)} className="text-green-400">
-                      Add
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <li className="text-gray-400 italic">None</li>
-              )}
-            </ul>
-          </div>
         </div>
       )}
 
