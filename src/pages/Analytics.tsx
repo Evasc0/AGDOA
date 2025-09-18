@@ -8,13 +8,14 @@ import {
   CategoryScale,
   LinearScale,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Pie } from 'react-chartjs-2';
 import { fareMatrix } from '../utils/fareMatrix';
 
 // Register Chart.js components
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement);
 
 const OPENWEATHER_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
 
@@ -51,6 +52,8 @@ const Analytics: React.FC = () => {
   const [dailyStats, setDailyStats] = useState<
     { date: string; earnings: number; rides: number }[]
   >([]);
+  const [filter, setFilter] = useState<'weekly' | 'monthly' | 'annually'>('weekly');
+  const [pieStats, setPieStats] = useState<{ label: string; earnings: number; rides: number }[]>([]);
 
   // Fetch 7-day weather forecast
   const fetchWeather = useCallback(() => {
@@ -85,7 +88,7 @@ const Analytics: React.FC = () => {
     });
   }, [alertMsg]);
 
-  // Fetch analytics data, calculates average wait time using stored waitTimeMinutes
+  // Fetch analytics data for bar chart (7 days)
   const fetchAnalytics = useCallback(async () => {
   if (!user) return;
   setRefreshing(true);
@@ -201,13 +204,113 @@ const Analytics: React.FC = () => {
   setRefreshing(false);
 }, [user]);
 
+  // Fetch data for pie chart based on filter
+  const fetchPie = useCallback(async (selectedFilter: 'weekly' | 'monthly' | 'annually') => {
+    if (!user) return;
+
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysBack = selectedFilter === 'annually' ? 365 : selectedFilter === 'monthly' ? 30 : 7;
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - (daysBack - 1));
+
+      const q = query(
+        collection(db, 'ride_logs'),
+        where('driverId', '==', user.uid),
+        where('timestamp', '>=', Timestamp.fromDate(startDate))
+      );
+
+      const snapshot = await getDocs(q);
+
+      let statMap: Record<string, { earnings: number; rides: number; date: Date }> = {};
+
+      // Initialize statMap for the period
+      for (let i = 0; i < daysBack; i++) {
+        const d = new Date(startDate.getTime() + i * 86400000);
+        const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        statMap[label] = { earnings: 0, rides: 0, date: d };
+      }
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const ts = data.timestamp?.toDate();
+        if (!ts) return;
+
+        const dropoffNameRaw = data.dropoffName || "";
+        const dropoffName = dropoffNameRaw.trim();
+
+        const normalizedFareMatrix: Record<string, number> = {};
+        Object.entries(fareMatrix).forEach(([key, val]) => {
+          normalizedFareMatrix[normalizeKey(key)] = val;
+        });
+
+        const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+
+        const dayLabel = ts.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        if (statMap[dayLabel]) {
+          statMap[dayLabel].earnings += fare;
+          statMap[dayLabel].rides += 1;
+        }
+      });
+
+      // Aggregate based on filter
+      let aggregated: Record<string, { earnings: number; rides: number }> = {};
+
+      if (selectedFilter === 'weekly') {
+        // For weekly, use daily
+        Object.entries(statMap).forEach(([label, data]) => {
+          aggregated[label] = data;
+        });
+      } else if (selectedFilter === 'monthly') {
+        // Group by week
+        Object.entries(statMap).forEach(([label, data]) => {
+          const weekStart = new Date(data.date);
+          weekStart.setDate(data.date.getDate() - data.date.getDay());
+          const weekLabel = weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          if (!aggregated[weekLabel]) {
+            aggregated[weekLabel] = { earnings: 0, rides: 0 };
+          }
+          aggregated[weekLabel].earnings += data.earnings;
+          aggregated[weekLabel].rides += data.rides;
+        });
+      } else if (selectedFilter === 'annually') {
+        // Group by month
+        Object.entries(statMap).forEach(([label, data]) => {
+          const monthLabel = data.date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+          if (!aggregated[monthLabel]) {
+            aggregated[monthLabel] = { earnings: 0, rides: 0 };
+          }
+          aggregated[monthLabel].earnings += data.earnings;
+          aggregated[monthLabel].rides += data.rides;
+        });
+      }
+
+      const pieData = Object.entries(aggregated).map(([label, data]) => ({
+        label,
+        earnings: data.earnings,
+        rides: data.rides
+      }));
+
+      setPieStats(pieData);
+    } catch (err) {
+      console.error("Error loading pie analytics:", err);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
       fetchWeather();
       fetchAnalytics();
+      fetchPie(filter);
     }
-  }, [user, fetchWeather, fetchAnalytics]);
+  }, [user, fetchWeather, fetchAnalytics, fetchPie, filter]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPie(filter);
+    }
+  }, [filter, fetchPie, user]);
 
   return (
     <div className="p-4 text-white max-w-4xl mx-auto">
@@ -270,6 +373,7 @@ const Analytics: React.FC = () => {
           onClick={() => {
             fetchAnalytics();
             fetchWeather();
+            fetchPie(filter);
           }}
           disabled={refreshing}
           className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-6 py-2 rounded-full shadow-md transition"
@@ -323,6 +427,90 @@ const Analytics: React.FC = () => {
                       label: (tooltipItem) => {
                         const label = tooltipItem.dataset.label || 'Unknown';
                         return `${label}: ${tooltipItem.parsed.y}`;
+                      },
+                    },
+                  },
+                  legend: {
+                    labels: {
+                      color: '#fff',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-900 p-6 rounded-xl shadow-lg mt-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">📊 Ride & Earnings Breakdown</h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilter('weekly')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                filter === 'weekly' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Weekly
+            </button>
+            <button
+              onClick={() => setFilter('monthly')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                filter === 'monthly' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setFilter('annually')}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                filter === 'annually' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Annually
+            </button>
+          </div>
+        </div>
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <Pie
+              data={{
+                labels: pieStats.map(s => s.label),
+                datasets: [
+                  {
+                    label: 'Earnings (₱)',
+                    data: pieStats.map(s => s.earnings),
+                    backgroundColor: [
+                      '#3b82f6',
+                      '#10b981',
+                      '#f59e0b',
+                      '#ef4444',
+                      '#8b5cf6',
+                      '#06b6d4',
+                      '#84cc16',
+                      '#f97316',
+                      '#ec4899',
+                      '#6b7280',
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#1f2937',
+                  },
+                ]
+              }}
+              options={{
+                responsive: true,
+                animation: {
+                  duration: 1200,
+                  easing: 'easeOutCubic',
+                },
+                plugins: {
+                  tooltip: {
+                    callbacks: {
+                      label: (tooltipItem) => {
+                        const label = tooltipItem.label || 'Unknown';
+                        const value = tooltipItem.parsed;
+                        return `${label}: ₱${value.toFixed(2)}`;
                       },
                     },
                   },
