@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../components/AuthContext";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import toast from "react-hot-toast";
 
@@ -54,6 +54,18 @@ const Profile = () => {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     setTimeout(async () => {
+      if (!user) return;
+      // Remove from queue if present
+      const queueRef = doc(db, "queues", user.uid);
+      try {
+        await deleteDoc(queueRef);
+      } catch (error) {
+        // Ignore if not in queue
+      }
+      // Set status to offline
+      const driverRef = doc(db, "drivers", user.uid);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
+
       await logout?.();
       localStorage.removeItem("driver");
       toast.success("Logout successful!");

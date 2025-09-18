@@ -5,18 +5,18 @@ import {
   onSnapshot,
   doc,
   deleteDoc,
-  addDoc,
+  setDoc,
+  getDoc,
   serverTimestamp,
   query,
   orderBy,
-  setDoc,
   writeBatch,
 } from "firebase/firestore";
 import {
   getAuth,
-  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import toast from "react-hot-toast";
 import EditDriverModal from "../components/EditDriverModal";
@@ -31,8 +31,8 @@ import {
 import {
   arrayMove,
   SortableContext,
-  useSortable,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +44,8 @@ interface Driver {
   email: string;
   status: "online" | "offline" | "in ride" | "waiting";
   createdAt?: any;
+  verified?: boolean;
+  phone?: string;
 }
 
 interface QueueEntry {
@@ -56,7 +58,8 @@ interface QueueEntry {
 }
 
 const SortableItem = ({ id, name, plate, onRemove }: any) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -88,17 +91,21 @@ const Admin = () => {
 
   const [user, setUser ] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [pendingDrivers, setPendingDrivers] = useState<Driver[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"drivers" | "logs" | "queue" | "history">("drivers");
+  const [tab, setTab] = useState<
+    "drivers" | "logs" | "queue" | "history" | "pending"
+  >("drivers");
 
-  const [newDriver, setNewDriver] = useState({ email: "", password: "", name: "", plate: "" });
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   // Keep track of driverId timers to set offline after 1 min if they don't return to queue
-  const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
   // Keep previous queue for comparison
   const prevQueueDriverIds = useRef<Set<string>>(new Set());
 
@@ -114,7 +121,7 @@ const Admin = () => {
     return () => unsubscribeAuth();
   }, [auth, navigate]);
 
-  // Fetch drivers and logs, and handle queue with status logic
+  // Fetch drivers, pending drivers, logs, and handle queue with status logic
   useEffect(() => {
     if (!user) return;
 
@@ -122,12 +129,13 @@ const Admin = () => {
     const unsubDrivers = onSnapshot(
       collection(db, "drivers"),
       (snap) => {
-        setDrivers(
-          snap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          } as Driver))
-        );
+        const allDrivers = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Driver[];
+
+        setDrivers(allDrivers.filter((d) => d.verified === true));
+        setPendingDrivers(allDrivers.filter((d) => d.verified === false));
       },
       (error) => {
         toast.error("Error fetching drivers: " + error.message);
@@ -142,16 +150,18 @@ const Admin = () => {
         const currentQueue = snap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        } as QueueEntry));
+        })) as QueueEntry[];
 
         setQueue(currentQueue);
 
         // Get current queue driver ids as a Set
-        const currentDriverIds = new Set(currentQueue.map(q => q.driverId));
+        const currentDriverIds = new Set(currentQueue.map((q) => q.driverId));
         const previousDriverIds = prevQueueDriverIds.current;
 
         // Detect drivers who left the queue (were in prev but not now)
-        const leftDrivers = Array.from(previousDriverIds).filter(id => !currentDriverIds.has(id));
+        const leftDrivers = Array.from(previousDriverIds).filter(
+          (id) => !currentDriverIds.has(id)
+        );
         // Detect drivers who joined or remain in queue (were not in prev or still in)
         const joinedOrStayedDrivers = Array.from(currentDriverIds);
 
@@ -163,19 +173,27 @@ const Admin = () => {
             clearTimeout(existingTimer);
           }
 
-          // Update Firestore status to "in ride"
           const driverRef = doc(db, "drivers", driverId);
+          const driverSnap = await getDoc(driverRef);
+          if (driverSnap.exists() && driverSnap.data().status === "offline") continue;
+
+          // Update Firestore status to "in ride"
           try {
             await setDoc(driverRef, { status: "in ride" }, { merge: true });
           } catch (error: any) {
-            toast.error("Failed to update driver status to Left the queue (In Ride): " + error.message);
+            toast.error(
+              "Failed to update driver status to Left the queue (In Ride): " +
+                error.message
+            );
           }
 
           // Set timeout to automatically set status to offline after 1 minute
           const timeout = setTimeout(async () => {
             try {
               await setDoc(driverRef, { status: "offline" }, { merge: true });
-              toast.success(`Driver ${driverId} status changed to Offline after 1 minute of leaving queue.`);
+              toast.success(
+                `Driver ${driverId} status changed to Offline after 1 minute of leaving queue.`
+              );
             } catch (error: any) {
               toast.error("Failed to update driver status to Offline: " + error.message);
             }
@@ -230,7 +248,7 @@ const Admin = () => {
       unsubQueue();
       unsubLogs();
       // Clear all timers on unmount
-      offlineTimers.current.forEach(timer => clearTimeout(timer));
+      offlineTimers.current.forEach((timer) => clearTimeout(timer));
       offlineTimers.current.clear();
     };
   }, [db, user]);
@@ -261,28 +279,6 @@ const Admin = () => {
       toast.success("Queue reordered successfully");
     } catch (error: any) {
       toast.error("Failed to reorder queue: " + error.message);
-    }
-  };
-
-  // Register new driver
-  const handleRegister = async () => {
-    const { email, password, name, plate } = newDriver;
-    if (!email || !password || !name || !plate) {
-      toast.error("Please fill all fields");
-      return;
-    }
-    try {
-      await addDoc(collection(db, "drivers"), {
-        name,
-        plate,
-        email,
-        status: "offline",
-        createdAt: serverTimestamp(),
-      });
-      toast.success("Driver registered successfully");
-      setNewDriver({ email: "", password: "", name: "", plate: "" });
-    } catch (err: any) {
-      toast.error("Failed to register driver: " + err.message);
     }
   };
 
@@ -322,12 +318,11 @@ const Admin = () => {
     }
   };
 
-  // Remove driver from queue (will be handled by queue listener logic)
+  // Remove driver from queue
   const removeFromQueue = async (id: string) => {
     try {
       await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
-      // No need to update status here, handled by the queue listener effect
     } catch (error: any) {
       toast.error("Failed to remove from queue: " + error.message);
     }
@@ -352,6 +347,19 @@ const Admin = () => {
 
   const handleLogout = async () => {
     try {
+      const user = auth.currentUser;
+      if (user) {
+        // Remove from queue if present
+        const queueRef = doc(db, "queues", user.uid);
+        try {
+          await deleteDoc(queueRef);
+        } catch (error) {
+          // Ignore if not in queue
+        }
+        // Set status to offline
+        const driverRef = doc(db, "drivers", user.uid);
+        await setDoc(driverRef, { status: "offline" }, { merge: true });
+      }
       await signOut(auth);
       toast.success("Logged out");
       navigate("/login");
@@ -371,19 +379,27 @@ const Admin = () => {
     <div className="p-4 max-w-6xl mx-auto text-white">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold">Admin Panel</h1>
-        <div className="flex gap-2 items-center">
-          {["drivers", "queue", "logs", "history"].map((type) => (
+        <div className="flex gap-2 items-center flex-wrap">
+          {["drivers", "queue", "logs", "history", "pending"].map((type) => (
             <button
               key={type}
               onClick={() => setTab(type as any)}
-              className={`px-3 py-2 rounded ${
+              className={`relative px-3 py-2 rounded ${
                 tab === type ? "bg-blue-600" : "bg-gray-700"
               }`}
             >
               {type[0].toUpperCase() + type.slice(1)}
+              {type === "pending" && pendingDrivers.length > 0 && (
+                <span className="absolute top-0 right-0 -mt-1 -mr-2 bg-red-600 text-xs rounded-full px-1.5">
+                  {pendingDrivers.length}
+                </span>
+              )}
             </button>
           ))}
-          <button onClick={handleLogout} className="px-3 py-2 rounded bg-red-600">
+          <button
+            onClick={handleLogout}
+            className="px-3 py-2 rounded bg-red-600 whitespace-nowrap"
+          >
             Logout
           </button>
         </div>
@@ -469,8 +485,8 @@ const Admin = () => {
                         getDriverStatus(driver.id) === "In Queue"
                           ? "text-green-400"
                           : getDriverStatus(driver.id) === "Left the queue (In Ride)"
-                            ? "text-yellow-400"
-                            : "text-red-400"
+                          ? "text-yellow-400"
+                          : "text-red-400"
                       }`}
                     >
                       {getDriverStatus(driver.id)}
@@ -487,7 +503,11 @@ const Admin = () => {
       {tab === "queue" && (
         <div className="bg-gray-800 p-4 rounded mt-4">
           <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext
               items={queue.map((q) => q.driverId)}
               strategy={verticalListSortingStrategy}
@@ -510,8 +530,8 @@ const Admin = () => {
                           status === "In Queue"
                             ? "text-green-400"
                             : status === "Left the queue (In Ride)"
-                              ? "text-yellow-400"
-                              : "text-red-400"
+                            ? "text-yellow-400"
+                            : "text-red-400"
                         }`}
                       >
                         {status}
@@ -534,7 +554,9 @@ const Admin = () => {
               <div key={log.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
                   <strong>{log.email}</strong> —{" "}
-                  {log.accessedAt?.seconds ? formatTime(log.accessedAt.seconds) : "No time"}
+                  {log.accessedAt?.seconds
+                    ? formatTime(log.accessedAt.seconds)
+                    : "No time"}
                 </p>
               </div>
             ))}
@@ -546,7 +568,7 @@ const Admin = () => {
       {tab === "history" && (
         <div className="mt-4 bg-gray-800 p-4 rounded">
           <h2 className="text-lg font-bold mb-2">Driver History</h2>
-          <div className="overflow-y-auto max-h-[400px] space-y-2">
+                    <div className="overflow-y-auto max-h-[400px] space-y-2">
             {drivers.map((driver) => (
               <div key={driver.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
@@ -556,6 +578,72 @@ const Admin = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* PENDING REGISTRATION REQUESTS */}
+      {tab === "pending" && (
+        <div className="bg-gray-800 p-4 rounded mt-4">
+          <h2 className="text-lg font-bold mb-2">Pending Registration Requests</h2>
+          {pendingDrivers.length === 0 ? (
+            <p>No pending requests.</p>
+          ) : (
+            <table className="w-full text-sm bg-gray-700 rounded overflow-hidden">
+              <thead>
+                <tr className="bg-gray-600 text-left">
+                  <th className="p-2">Name</th>
+                  <th>Plate</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th className="text-right pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingDrivers.map((driver) => (
+                  <tr key={driver.id} className="border-t border-gray-600">
+                    <td className="p-2">{driver.name}</td>
+                    <td>{driver.plate}</td>
+                    <td>{driver.email}</td>
+                    <td>{driver.phone || "N/A"}</td>
+                    <td>Pending</td>
+                    <td className="space-x-2 text-right pr-4">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await setDoc(
+                              doc(db, "drivers", driver.id),
+                              { verified: true },
+                              { merge: true }
+                            );
+                            toast.success(`Verified ${driver.name}`);
+                          } catch (error: any) {
+                            toast.error("Failed to verify: " + error.message);
+                          }
+                        }}
+                        className="text-green-400"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await deleteDoc(doc(db, "drivers", driver.id));
+                            toast.success(`Rejected and deleted ${driver.name}`);
+                          } catch (error: any) {
+                            toast.error("Failed to delete: " + error.message);
+                          }
+                        }}
+                        className="text-red-400"
+                      >
+                        Reject
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -571,4 +659,3 @@ const Admin = () => {
 };
 
 export default Admin;
-

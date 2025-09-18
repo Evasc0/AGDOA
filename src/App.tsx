@@ -1,10 +1,11 @@
-// src/App.tsx
 import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   getFirestore,
   collection,
+  doc,
+  getDoc,
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
@@ -21,45 +22,106 @@ import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { Toaster, toast } from "react-hot-toast";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import { RideProvider } from "./components/RideContext";
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+// Unified admin email constant
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || "agduwaadmin@gmail.com").trim().toLowerCase();
 
 const App = () => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser ] = useState<any>(null);
+  const [verified, setVerified] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const db = getFirestore();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("Firebase User:", firebaseUser); // Debug log
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser ) => {
+      if (firebaseUser ) {
+        setUser (firebaseUser );
 
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const isAdminUser =
-          firebaseUser.email?.toLowerCase() === ADMIN_EMAIL?.toLowerCase();
+        const email = firebaseUser .email?.trim().toLowerCase() || "";
+        console.log("ADMIN_EMAIL:", ADMIN_EMAIL);
+        console.log("Logged in user email:", email);
 
-        if (isAdminUser) {
+        const isAdminUser  = email === ADMIN_EMAIL;
+        console.log("Is admin user:", isAdminUser );
+
+        if (isAdminUser ) {
+          // Admin user: log access and mark verified
           try {
             await addDoc(collection(db, "adminAccessLogs"), {
-              email: firebaseUser.email,
-              uid: firebaseUser.uid,
+              email: firebaseUser .email,
+              uid: firebaseUser .uid,
               accessedAt: serverTimestamp(),
             });
             toast.success("✅ Welcome, Admin!");
           } catch (error) {
             console.error("Error logging admin access:", error);
           }
+          setVerified(true); // Admins are always verified
+
+          // Set localStorage for admin
+          localStorage.setItem(
+            "driver",
+            JSON.stringify({
+              id: firebaseUser .uid,
+              email: firebaseUser .email,
+              verified: true,
+              // Add other admin fields if needed
+            })
+          );
         } else {
-          toast.success("✅ Logged in successfully!");
+          // Non-admin user: check Firestore driver document for verification
+          try {
+            const driverDoc = await getDoc(doc(db, "drivers", firebaseUser .uid));
+            if (driverDoc.exists()) {
+              const data = driverDoc.data();
+              if (data.verified) {
+                setVerified(true);
+                toast.success("✅ Logged in successfully!");
+
+                // Set localStorage for driver
+                localStorage.setItem(
+                  "driver",
+                  JSON.stringify({ id: firebaseUser .uid, email: firebaseUser .email, ...data })
+                );
+              } else {
+                // Not verified: sign out and notify
+                await auth.signOut();
+                setUser (null);
+                setVerified(false);
+                toast.error(
+                  "Your account is not verified by admin yet. Please wait for approval."
+                );
+                localStorage.removeItem("driver");
+              }
+            } else {
+              // No driver doc found, sign out
+              await auth.signOut();
+              setUser (null);
+              setVerified(false);
+              toast.error("No profile found for this account.");
+              localStorage.removeItem("driver");
+            }
+          } catch (error) {
+            console.error("Error checking verification:", error);
+            await auth.signOut();
+            setUser (null);
+            setVerified(false);
+            toast.error("Error verifying account.");
+            localStorage.removeItem("driver");
+          }
         }
       } else {
-        setUser(null);
+        // No user logged in
+        setUser (null);
+        setVerified(false);
+        localStorage.removeItem("driver");
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [db]);
 
   if (loading) {
     return (
@@ -70,11 +132,11 @@ const App = () => {
     );
   }
 
-  const isAuthenticated = !!user;
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL?.toLowerCase();
+  const isAuthenticated = !!user && verified === true;
+  const isAdmin = user?.email?.trim().toLowerCase() === ADMIN_EMAIL;
 
   return (
-    <>
+    <RideProvider>
       <Toaster position="top-center" />
       <Routes>
         {/* Root route */}
@@ -116,13 +178,13 @@ const App = () => {
           }
         />
 
-        {/* Redirect unauthenticated users trying to access protected routes */}
+        {/* Redirect unauthenticated or unverified users trying to access protected routes */}
         {!isAuthenticated && <Route path="*" element={<Navigate to="/" />} />}
 
         {/* Not Found fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </RideProvider>
   );
 };
 

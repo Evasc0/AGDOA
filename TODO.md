@@ -1,0 +1,8 @@
+- [ ] Remove phone-related imports from Login.tsx
+- [ ] Remove phone-related states (phone, verificationCode, confirmationResult, showVerification, phoneVerified)
+- [ ] Remove sendVerificationCode and verifyCode functions
+- [ ] Remove recaptcha setup useEffect
+- [ ] Update handleAuth: remove phone from required fields, remove phoneVerified check, remove phone from driverData, set contact to ""
+- [ ] Update UI: remove phone input, verify button, verification code input, phoneVerified message
+- [ ] For admin signin, set contact to ""
+- [ ] Test login and signup functionality

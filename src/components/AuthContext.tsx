@@ -7,7 +7,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
@@ -21,14 +21,15 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser ] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const navigate = useNavigate();
+  // Remove navigate here to avoid conflicting redirects
+  // const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser ) => {
+      setUser (firebaseUser );
       setLoading(false);
     });
 
@@ -37,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-    navigate("/home");
+    // Removed navigate here to let App.tsx handle redirects
   };
 
   const signUp = async (email: string, password: string) => {
@@ -60,13 +61,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       lastOnline: serverTimestamp(),
     });
 
-    navigate("/home");
+    // Removed navigate here to let App.tsx handle redirects
   };
 
   const logout = async () => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      // Remove from queue if present
+      const queueRef = doc(db, "queues", currentUser.uid);
+      try {
+        await deleteDoc(queueRef);
+      } catch (error) {
+        // Ignore if not in queue
+      }
+      // Set status to offline
+      const driverRef = doc(db, "drivers", currentUser.uid);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
+    }
     await signOut(auth);
-    setUser(null);
-    navigate("/login");
+    setUser (null);
+    // You can navigate to login here if you want, or handle in App.tsx
   };
 
   return (

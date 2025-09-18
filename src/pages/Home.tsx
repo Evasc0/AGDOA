@@ -1,378 +1,58 @@
-import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { db } from "../firebase";
-import {
-  doc,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-  collection,
-  query,
-  orderBy,
-  Timestamp,
-  addDoc,
-} from "firebase/firestore";
-import { useDriverLocation } from "../hooks/useDriverLocation";
+import { db, auth } from "../firebase";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { fareMatrix } from "../utils/fareMatrix";
+import { useRide } from "../components/RideContext";
 
 const AVERAGE_WAIT_TIME_PER_DRIVER = 5; // in minutes
 
 const Home = () => {
-  const [driver, setDriver] = useState<any>(null);
-  const [isOnline, setIsOnline] = useState(false);
-  const [manualOffline, setManualOffline] = useState(false);
-  const [hasJoined, setHasJoined] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("hasJoinedQueue") === "true";
-    }
-    return false;
-  });
-  const [queue, setQueue] = useState<any[]>([]);
-  const [position, setPosition] = useState<number | null>(null);
-  // driverJoinedAt records the time driver joined the queue
-  const [driverJoinedAt, setDriverJoinedAt] = useState<Timestamp | null>(null);
-  const [toastMsg, setToastMsg] = useState("");
-  const [rideStarted, setRideStarted] = useState(false);
-  // rideStartTime records the time driver started the ride (and left the queue)
-  const [rideStartTime, setRideStartTime] = useState<Date | null>(null);
-  const [pickupLocation, setPickupLocation] = useState<any>(null);
-  const [countdown, setCountdown] = useState("--:--");
-  const [rideStatus, setRideStatus] = useState<
-    "Offline" | "Waiting" | "In Ride"
-  >("Offline");
-  const [selectedDestination, setSelectedDestination] = useState<string | null>(
-    null
-  );
-  const [hasExitedParadahan, setHasExitedParadahan] = useState(false);
-
-  // New state to store the time driver returned to paradahan after ride end
-  const [lastReturnTime, setLastReturnTime] = useState<Date | null>(null);
-  // New state to store the current wait time before ride start
-  const [currentWaitTimeMinutes, setCurrentWaitTimeMinutes] = useState<number>(0);
-
-  const { coords, insideParadahan, error: gpsError } = useDriverLocation();
-
-  useEffect(() => {
-    const stored = localStorage.getItem("driver");
-    if (stored) setDriver(JSON.parse(stored));
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("hasJoinedQueue", hasJoined ? "true" : "false");
-  }, [hasJoined]);
-
-  useEffect(() => {
-    const unsynced = localStorage.getItem("unsyncedRide");
-    if (unsynced && insideParadahan) {
-      const ride = JSON.parse(unsynced);
-      addDoc(collection(db, "ride_logs"), ride)
-        .then(() => localStorage.removeItem("unsyncedRide"))
-        .catch((err) => console.error("Sync failed:", err));
-    }
-  }, [insideParadahan]);
-
-  useEffect(() => {
-    if (insideParadahan && !manualOffline) {
-      setIsOnline(true);
-    } else if (!insideParadahan && !rideStarted) {
-      setIsOnline(false);
-    }
-  }, [insideParadahan, manualOffline, rideStarted]);
-
-  useEffect(() => {
-    if (!isOnline) {
-      setRideStatus("Offline");
-    } else if (rideStarted) {
-      setRideStatus("In Ride");
-    } else {
-      setRideStatus("Waiting");
-    }
-  }, [isOnline, rideStarted]);
-
-  // When driver joins the queue, record 'joinedAt' timestamp both in Firestore and local state
-  useEffect(() => {
-    const joinIfInside = async () => {
-      if (
-        driver &&
-        isOnline &&
-        insideParadahan &&
-        !hasJoined &&
-        !manualOffline
-      ) {
-        const driverRef = doc(db, "queues", driver.id);
-        try {
-          const joinedAt = Timestamp.now(); // Current time when joining queue
-          await setDoc(driverRef, {
-            driverId: driver.id,
-            plateNumber: driver.plate,
-            joinedAt,
-          });
-          setDriverJoinedAt(joinedAt); // Save locally for later wait time calculation
-          setHasJoined(true);
-        } catch (err) {
-          console.error("Failed to join queue:", err);
-          setToastMsg("⚠️ Failed to join queue. Retrying...");
-          setTimeout(() => setToastMsg(""), 3000);
-        }
-      }
-    };
-    joinIfInside();
-  }, [insideParadahan, coords, driver, hasJoined, manualOffline, isOnline]);
-
-  useEffect(() => {
-    const handleExitParadahan = async () => {
-      // If user leaves the paradahan but had joined queue,
-      // remove from queue and mark as exited for ride start process
-      if (driver && hasJoined && !insideParadahan && coords) {
-        try {
-          await deleteDoc(doc(db, "queues", driver.id));
-          setHasJoined(false);
-          setPosition(null);
-          setQueue([]);
-          setDriverJoinedAt(null);
-          setToastMsg("⛔ You left the paradahan. Ride starting...");
-          setTimeout(() => setToastMsg(""), 4000);
-
-          setHasExitedParadahan(true);
-          setPickupLocation({ lat: coords.latitude, lng: coords.longitude });
-
-          // On exiting paradahan without a ride, calculate and set wait time if lastReturnTime available
-          if (lastReturnTime) {
-            const exitTime = new Date();
-            const waitMins = Math.round(
-              (exitTime.getTime() - lastReturnTime.getTime()) / 60000
-            );
-            setCurrentWaitTimeMinutes(waitMins > 0 ? waitMins : 0);
-          }
-        } catch (err) {
-          console.error("Failed to remove from queue:", err);
-          setToastMsg(
-            "⚠️ Failed to update queue on exit. Please check connection."
-          );
-          setTimeout(() => setToastMsg(""), 4000);
-        }
-      }
-    };
-    handleExitParadahan();
-  }, [insideParadahan, driver, hasJoined, coords, lastReturnTime]);
-
-  // Record ride completion and log wait time and travel time in ride_logs collection
-  useEffect(() => {
-    const handleReturn = async () => {
-      if (
-        rideStarted &&
-        insideParadahan &&
-        coords &&
-        rideStartTime &&
-        hasExitedParadahan
-      ) {
-        const endedAt = new Date();
-        const travelTime = Math.round(
-          (endedAt.getTime() - rideStartTime.getTime()) / 60000
-        ); // minutes of actual trip time
-
-        const dropoffLocation = { lat: coords.latitude, lng: coords.longitude };
-        const fare = selectedDestination ? fareMatrix[selectedDestination] : 0;
-
-        // Use the currentWaitTimeMinutes state as wait time in queue stored here
-        const waitTimeMinutes = currentWaitTimeMinutes;
-
-        const rideLog = {
-          driverId: driver?.id,
-          plateNumber: driver?.plate,
-          startedAt: rideStartTime,
-          endedAt,
-          travelTimeMinutes: travelTime,
-          pickupLocation,
-          dropoffLocation,
-          dropoffName: selectedDestination,
-          waitTimeMinutes, // wait time in queue stored here
-          estimatedEarnings: fare,
-          timestamp: Timestamp.now(),
-          queuePosition: position ?? null,
-        };
-
-        // Log the ride log and wait time
-        console.log("Ride Log:", rideLog);
-        console.log("Wait Time Minutes:", waitTimeMinutes);
-
-        try {
-          await addDoc(collection(db, "ride_logs"), rideLog);
-          // Save endedAt as lastReturnTime for next wait time calculation
-          setLastReturnTime(endedAt);
-        } catch (err) {
-          console.error("Failed to log ride, saving locally.", err);
-          localStorage.setItem("unsyncedRide", JSON.stringify(rideLog));
-        }
-
-        // Reset ride-related states
-        setRideStarted(false);
-        setRideStartTime(null);
-        setPickupLocation(null);
-        setSelectedDestination(null);
-        setHasExitedParadahan(false);
-        setDriverJoinedAt(null); // reset joinedAt for next queue
-        setCurrentWaitTimeMinutes(0);
-        setToastMsg(`✅ Ride completed at ${selectedDestination} — ₱${fare}`);
-        setTimeout(() => setToastMsg(""), 5000);
-      }
-    };
-    handleReturn();
-  }, [
-    insideParadahan,
-    coords,
-    rideStartTime,
-    selectedDestination,
-    hasExitedParadahan,
-    position,
+  const navigate = useNavigate();
+  const {
     driver,
-    currentWaitTimeMinutes,
-    pickupLocation,
-  ]);
+    isOnline,
+    hasJoined,
+    queue,
+    position,
+    rideStarted,
+    countdown,
+    rideStatus,
+    selectedDestination,
+    setSelectedDestination,
+    handleGoOffline,
+    handleGoOnlineAgain,
+    handleStartRide,
+    setToastMsg,
+    coords,
+    insideParadahan,
+    gpsError,
+    toastMsg,
+  } = useRide();
 
-  // Listen for real-time queue updates and maintain position and driverJoinedAt timestamp
-  useEffect(() => {
-    const q = query(collection(db, "queues"), orderBy("joinedAt"));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => doc.data());
-      setQueue(data);
-      const pos = data.findIndex((d) => d.driverId === driver?.id);
-      if (rideStarted || !hasJoined) {
-        setPosition(null);
-        setDriverJoinedAt(null);
-      } else {
-        if (pos >= 0) {
-          setPosition(pos + 1);
-          const driverEntry = data[pos];
-          if (driverEntry.joinedAt) {
-            setDriverJoinedAt(driverEntry.joinedAt);
-          } else {
-            setDriverJoinedAt(null);
-          }
-        } else {
-          setPosition(null);
-          setDriverJoinedAt(null);
-        }
-      }
-    });
-    return () => unsub();
-  }, [driver, rideStarted, hasJoined]);
-
-  // Real-time countdown for Estimated Wait based on position using an interval that ticks every second
-  useEffect(() => {
-    let interval: any = null;
-    let remainingSeconds = position ? position * AVERAGE_WAIT_TIME_PER_DRIVER * 60 : 0;
-
-    const updateCountdown = () => {
-      if (remainingSeconds > 0) {
-        const mins = Math.floor(remainingSeconds / 60);
-        const secs = remainingSeconds % 60;
-        setCountdown(`${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`);
-        remainingSeconds -= 1;
-      } else {
-        setCountdown("00:00");
-        if (interval) clearInterval(interval);
-      }
-    };
-
-    if (position && !rideStarted) {
-      updateCountdown();
-      interval = setInterval(updateCountdown, 1000);
-    } else {
-      setCountdown("--:--");
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [position, rideStarted]);
-
-  // Manual offline: Remove driver from queue and update states
-  const handleGoOffline = async () => {
+  // Logout: Set status to offline, remove from queue, sign out, navigate to login
+  const handleLogout = async () => {
     if (!driver) return;
     try {
-      await deleteDoc(doc(db, "queues", driver.id));
-      setHasJoined(false);
-      setPosition(null);
-      setQueue([]);
-      setDriverJoinedAt(null);
-      setManualOffline(true);
-      setIsOnline(false);
-      setToastMsg("🔴 You are now offline.");
-      setTimeout(() => setToastMsg(""), 3000);
-    } catch (err) {
-      console.error("Failed to go offline:", err);
-      setToastMsg("⚠️ Failed to go offline. Please try again.");
-      setTimeout(() => setToastMsg(""), 3000);
-    }
-  };
-
-  // Manual online: Join queue and set driverJoinedAt timestamp
-  const handleGoOnlineAgain = async () => {
-    if (!driver || !coords) return;
-    setManualOffline(false);
-    setIsOnline(true);
-
-    if (!insideParadahan) {
-      setToastMsg("📍 To join the queue, you must be inside the paradahan.");
-      setTimeout(() => setToastMsg(""), 4000);
-    } else {
-      const driverRef = doc(db, "queues", driver.id);
+      // Remove from queue if present
+      const queueRef = doc(db, "queues", driver.id);
       try {
-        const joinedAt = Timestamp.now();
-        await setDoc(driverRef, {
-          driverId: driver.id,
-          plateNumber: driver.plate,
-          joinedAt,
-        });
-        setDriverJoinedAt(joinedAt); // Maintain the join timestamp for wait time
-        setHasJoined(true);
-      } catch (err) {
-        console.error("Failed to join queue:", err);
-        setToastMsg("⚠️ Failed to join queue. Please try again.");
-        setTimeout(() => setToastMsg(""), 3000);
+        await deleteDoc(queueRef);
+      } catch (error) {
+        // Ignore if not in queue
       }
-    }
-  };
+      // Set status to offline
+      const driverRef = doc(db, "drivers", driver.id);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
 
-  // Start ride: Remove from queue, update ride status and rideStartTime
-  const handleStartRide = async () => {
-    if (!selectedDestination) {
-      setToastMsg("⚠️ Please select a destination first.");
-      setTimeout(() => setToastMsg(""), 3000);
-      return;
-    }
-    if (!coords) {
-      setToastMsg("⚠️ Location not available. Please try again.");
-      setTimeout(() => setToastMsg(""), 3000);
-      return;
-    }
-
-    try {
-      if (driver) {
-        await deleteDoc(doc(db, "queues", driver.id));
-      }
-      const newRideStartTime = new Date();
-      setHasJoined(false);
-      setRideStarted(true);
-      setRideStartTime(newRideStartTime); // Mark ride start (queue exit time)
-
-      // Calculate wait time as difference between ride start and driver joined time
-      if (driverJoinedAt) {
-        const waitMins = Math.round(
-          (newRideStartTime.getTime() - driverJoinedAt.toMillis()) / 60000
-        );
-        setCurrentWaitTimeMinutes(waitMins > 0 ? waitMins : 0);
-      } else {
-        setCurrentWaitTimeMinutes(0);
-      }
-
-      setToastMsg("🚕 Ride started! Please exit paradahan to begin trip.");
-      setTimeout(() => setToastMsg(""), 3000);
-    } catch (err) {
-      console.error("Failed to start ride:", err);
-      setToastMsg("⚠️ Failed to start ride. Please try again.");
+      await signOut(auth);
+      localStorage.removeItem("driver");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setToastMsg("⚠️ Logout failed. Please try again.");
       setTimeout(() => setToastMsg(""), 3000);
     }
   };
