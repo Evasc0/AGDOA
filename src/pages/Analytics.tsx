@@ -39,6 +39,18 @@ const weatherToEmoji = (desc: string): string => {
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
 
+// Define distinct color arrays for different time periods
+const dailyColors = [
+  '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#800080'
+];
+const weeklyColors = [
+  '#FF6347', '#32CD32', '#1E90FF', '#FFD700'
+];
+const monthlyColors = [
+  '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#800080',
+  '#FFA500', '#A52A2A', '#808080', '#000080', '#008080'
+];
+
 const Analytics: React.FC = () => {
   const { user } = useAuth();
 
@@ -481,18 +493,17 @@ const Analytics: React.FC = () => {
                   {
                     label: 'Earnings (₱)',
                     data: pieStats.map(s => s.earnings),
-                    backgroundColor: [
-                      '#3b82f6',
-                      '#10b981',
-                      '#f59e0b',
-                      '#ef4444',
-                      '#8b5cf6',
-                      '#06b6d4',
-                      '#84cc16',
-                      '#f97316',
-                      '#ec4899',
-                      '#6b7280',
-                    ],
+                    backgroundColor: (() => {
+                      if (filter === 'weekly') {
+                        return dailyColors.slice(0, pieStats.length);
+                      } else if (filter === 'monthly') {
+                        return weeklyColors.slice(0, pieStats.length);
+                      } else if (filter === 'annually') {
+                        return monthlyColors.slice(0, pieStats.length);
+                      } else {
+                        return ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'].slice(0, pieStats.length);
+                      }
+                    })(),
                     borderWidth: 2,
                     borderColor: '#1f2937',
                   },
