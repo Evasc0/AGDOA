@@ -11,6 +11,9 @@ import {
   query,
   orderBy,
   writeBatch,
+  where,
+  getDocs,
+  Timestamp,
 } from "firebase/firestore";
 import {
   getAuth,
@@ -36,6 +39,33 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+import { fareMatrix } from '../utils/fareMatrix';
+
+// Register Chart.js components
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+// Driver colors for pie chart and boxes
+const driverColors = Array.from({length: 50}, (_, i) => `hsl(${i * 7.2}, 70%, 50%)`);
+const driverBgClasses = [
+  'bg-red-500', 'bg-red-600', 'bg-red-700', 'bg-red-800', 'bg-red-900',
+  'bg-blue-500', 'bg-blue-600', 'bg-blue-700', 'bg-blue-800', 'bg-blue-900',
+  'bg-green-500', 'bg-green-600', 'bg-green-700', 'bg-green-800', 'bg-green-900',
+  'bg-yellow-500', 'bg-yellow-600', 'bg-yellow-700', 'bg-yellow-800', 'bg-yellow-900',
+  'bg-purple-500', 'bg-purple-600', 'bg-purple-700', 'bg-purple-800', 'bg-purple-900',
+  'bg-pink-500', 'bg-pink-600', 'bg-pink-700', 'bg-pink-800', 'bg-pink-900',
+  'bg-indigo-500', 'bg-indigo-600', 'bg-indigo-700', 'bg-indigo-800', 'bg-indigo-900',
+  'bg-teal-500', 'bg-teal-600', 'bg-teal-700', 'bg-teal-800', 'bg-teal-900',
+  'bg-orange-500', 'bg-orange-600', 'bg-orange-700', 'bg-orange-800', 'bg-orange-900',
+  'bg-cyan-500', 'bg-cyan-600', 'bg-cyan-700', 'bg-cyan-800', 'bg-cyan-900',
+  'bg-gray-500', 'bg-gray-600', 'bg-gray-700', 'bg-gray-800', 'bg-gray-900'
+];
 
 interface Driver {
   id: string;
@@ -55,6 +85,14 @@ interface QueueEntry {
   joinedAt?: any;
   order?: number;
   id?: string;
+}
+
+interface Ride {
+  id: string;
+  createdAt?: any;
+  fare?: number;
+  status?: string;
+  driverId?: string;
 }
 
 const SortableItem = ({ id, name, plate, onRemove }: any) => {
@@ -84,6 +122,8 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
   );
 };
 
+const normalizeKey = (key: string) => key.trim().toLowerCase();
+
 const Admin = () => {
   const db = getFirestore();
   const auth = getAuth();
@@ -96,11 +136,17 @@ const Admin = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<
-    "drivers" | "logs" | "queue" | "history" | "pending"
+    "drivers" | "logs" | "queue" | "history" | "pending" | "analytics"
   >("drivers");
 
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+
+  const [analyticsFilter, setAnalyticsFilter] = useState<'daily' | 'weekly' | 'monthly' | 'annually'>('weekly');
+  const [allPieStats, setAllPieStats] = useState<{ label: string; earnings: number; rides: number }[]>([]);
+  const [driverPieStats, setDriverPieStats] = useState<Record<string, { label: string; earnings: number; rides: number }[]>>({});
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [totalRides, setTotalRides] = useState(0);
 
   // Keep track of driverId timers to set offline after 1 min if they don't return to queue
   const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -108,6 +154,8 @@ const Admin = () => {
   );
   // Keep previous queue for comparison
   const prevQueueDriverIds = useRef<Set<string>>(new Set());
+  // Keep track of previous pending drivers count for notifications
+  const prevPendingCount = useRef<number>(0);
 
   // Monitor authentication status
   useEffect(() => {
@@ -125,6 +173,8 @@ const Admin = () => {
   useEffect(() => {
     if (!user) return;
 
+    console.log("User in Admin:", user);
+
     // Listen to drivers collection
     const unsubDrivers = onSnapshot(
       collection(db, "drivers"),
@@ -134,10 +184,26 @@ const Admin = () => {
           ...doc.data(),
         })) as Driver[];
 
-        setDrivers(allDrivers.filter((d) => d.verified === true));
-        setPendingDrivers(allDrivers.filter((d) => d.verified === false));
+        console.log("All drivers fetched:", allDrivers);
+
+        const verifiedDrivers = allDrivers.filter((d) => d.verified === true);
+        const pending = allDrivers.filter((d) => d.verified === false);
+
+        console.log("Verified drivers:", verifiedDrivers);
+        console.log("Pending drivers:", pending);
+
+        setDrivers(verifiedDrivers);
+        setPendingDrivers(pending);
+
+        // Notify admin of new pending registration requests
+        if (pending.length > prevPendingCount.current) {
+          const newRequests = pending.length - prevPendingCount.current;
+          toast(`New pending registration request${newRequests > 1 ? 's' : ''} (${newRequests})`);
+        }
+        prevPendingCount.current = pending.length;
       },
       (error) => {
+        console.error("Error fetching drivers:", error);
         toast.error("Error fetching drivers: " + error.message);
       }
     );
@@ -375,12 +441,101 @@ const Admin = () => {
     return date.toLocaleString();
   };
 
+  // Fetch analytics data
+  const fetchAnalytics = async () => {
+    try {
+      const ridesQuery = query(collection(db, "ride_logs"), orderBy("timestamp", "desc"));
+      const ridesSnap = await getDocs(ridesQuery);
+      const rides = ridesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      console.log("Fetched ride_logs:", rides);
+
+      const now = new Date();
+      let startDate: Date;
+
+      switch (analyticsFilter) {
+        case 'daily':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case 'weekly':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'monthly':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          break;
+        case 'annually':
+          startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          break;
+        default:
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      const filteredRides = rides.filter(ride => {
+        const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
+        return rideDate >= startDate;
+      });
+
+      // Calculate per-driver stats first
+      const driverStats: Record<string, { label: string; earnings: number; rides: number }[]> = {};
+      let totalEarnings = 0;
+      let totalRides = 0;
+      drivers.forEach(driver => {
+        const driverRides = filteredRides.filter(ride => ride.driverId === driver.id);
+        const driverEarnings = driverRides.reduce((sum, ride) => {
+          const dropoffNameRaw = ride.dropoffName || "";
+          const dropoffName = dropoffNameRaw.trim();
+          const normalizedFareMatrix: Record<string, number> = {};
+          Object.entries(fareMatrix).forEach(([key, val]) => {
+            normalizedFareMatrix[normalizeKey(key)] = val;
+          });
+          const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+          return sum + fare;
+        }, 0);
+        const driverRideCount = driverRides.length;
+
+        totalEarnings += driverEarnings;
+        totalRides += driverRideCount;
+
+        // Always add stats for all drivers, even with 0 rides
+        driverStats[driver.id] = [
+          { label: 'Rides', earnings: driverRideCount, rides: driverRideCount },
+          { label: 'Earnings', earnings: driverEarnings, rides: driverRideCount },
+        ];
+      });
+
+      const completedRides = filteredRides.filter(ride => ride.status === 'completed').length;
+
+      // Set pie chart data to per-driver earnings
+      const driverPieData: { label: string; earnings: number; rides: number }[] = drivers.map((driver, index) => {
+        const stats = driverStats[driver.id];
+        if (!stats) return null;
+        const earnings = stats[1]?.earnings || 0;
+        const rides = stats[0]?.rides || 0;
+        return { label: driver.name, earnings, rides };
+      }).filter(Boolean) as { label: string; earnings: number; rides: number }[];
+
+      setAllPieStats(driverPieData);
+
+      setDriverPieStats(driverStats);
+      setTotalEarnings(totalEarnings);
+      setTotalRides(totalRides);
+    } catch (error: any) {
+      toast.error("Failed to fetch analytics: " + error.message);
+    }
+  };
+
+  // Fetch analytics when tab changes to analytics or filter changes
+  useEffect(() => {
+    if (tab === "analytics" && user) {
+      fetchAnalytics();
+    }
+  }, [tab, analyticsFilter, user]);
+
   return (
     <div className="p-4 max-w-6xl mx-auto text-white">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h1 className="text-xl font-bold">Admin Panel</h1>
         <div className="flex gap-2 items-center flex-wrap">
-          {["drivers", "queue", "logs", "history", "pending"].map((type) => (
+          {["drivers", "queue", "logs", "history", "pending", "analytics"].map((type) => (
             <button
               key={type}
               onClick={() => setTab(type as any)}
@@ -644,6 +799,103 @@ const Admin = () => {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* ANALYTICS */}
+      {tab === "analytics" && (
+        <div className="mt-4 bg-gray-800 p-4 rounded">
+          <h2 className="text-lg font-bold mb-4">Analytics Dashboard</h2>
+
+          {/* Filter Buttons */}
+          <div className="flex gap-2 mb-6">
+          {['daily', 'weekly', 'monthly', 'annually'].map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setAnalyticsFilter(filter as any)}
+                className={`px-4 py-2 rounded ${
+                  analyticsFilter === filter ? "bg-blue-600" : "bg-gray-700"
+                }`}
+              >
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Overall Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-gray-700 p-4 rounded">
+              <h3 className="text-md font-semibold mb-2">Overall Statistics</h3>
+              {allPieStats.length > 0 && (
+                <Pie
+                  data={{
+                    labels: allPieStats.map(stat => stat.label),
+                    datasets: [{
+                      data: allPieStats.map(stat => stat.earnings),
+                      backgroundColor: driverColors.slice(0, allPieStats.length),
+                      borderColor: driverColors.slice(0, allPieStats.length),
+                      borderWidth: 1,
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: {
+                      legend: {
+                        position: 'bottom',
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => `${context.label}: ₱${context.parsed}`,
+                        },
+                      },
+                    },
+                  }}
+                />
+              )}
+              {/* Total Summary */}
+              <div className="mt-4 text-sm font-bold">
+                <p><span className="text-gray-300">Total Rides:</span> {totalRides}</p>
+                <p><span className="text-gray-300">Total Earnings:</span> ₱{totalEarnings}</p>
+              </div>
+            </div>
+
+            {/* Per-Driver Stats */}
+            <div className="bg-gray-700 p-4 rounded">
+              <h3 className="text-md font-semibold mb-2">Driver Performance</h3>
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                {drivers.map((driver, index) => {
+                  const driverStats = driverPieStats[driver.id];
+                  if (!driverStats || driverStats.length === 0) return null;
+
+                  return (
+                    <div key={driver.id} className={`${driverBgClasses[index % driverBgClasses.length]} p-3 rounded font-medium mb-2`}>
+                      <h4 className="font-medium mb-2">{driver.name} ({driver.plate})</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-300">Rides:</span> {driverStats[0]?.earnings || 0}
+                        </div>
+                        <div>
+                          <span className="text-gray-300">Earnings:</span> ₱{driverStats[1]?.earnings || 0}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Total Summary */}
+                <div className="bg-gray-600 p-3 rounded font-bold border-t border-gray-500">
+                  <h4 className="mb-2">Total for All Drivers</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-300">Total Rides:</span> {totalRides}
+                    </div>
+                    <div>
+                      <span className="text-gray-300">Total Earnings:</span> ₱{totalEarnings}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
