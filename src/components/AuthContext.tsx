@@ -41,24 +41,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Removed navigate here to let App.tsx handle redirects
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, additionalData?: {
+    name?: string;
+    plate?: string;
+    vehicle?: string;
+    phone?: string;
+  }) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = userCredential.user.uid;
 
-    // Create default Firestore driver record
-    const driverRef = doc(db, "drivers", userCredential.user.uid);
+    // Check if user is admin
+    const isAdmin = ["agduwaadmin@gmail.com"].some(
+      (adminEmail) => adminEmail.toLowerCase() === email.toLowerCase()
+    );
+
+    // Create driver record with proper verification status
+    const driverRef = doc(db, "drivers", uid);
     await setDoc(driverRef, {
-      displayName: email.split("@")[0] || "New Driver",
+      id: uid,
+      name: additionalData?.name || email.split("@")[0] || "New Driver",
+      plate: additionalData?.plate || "",
+      vehicle: additionalData?.vehicle || "",
       email,
-      plateNumber: "",
-      vehicle: "",
-      status: "Offline",
-      age: null,
-      contact: "",
-      paymentMethod: "",
+      phone: additionalData?.phone || "",
+      status: "offline",
+      age: "",
+      contact: additionalData?.phone || "",
+      image: null,
+      paymentMethod: "GCash",
       paymentNumber: "",
-      profileImageUrl: "",
       createdAt: serverTimestamp(),
-      lastOnline: serverTimestamp(),
+      verified: isAdmin, // admins auto verified, others false
     });
 
     // Removed navigate here to let App.tsx handle redirects

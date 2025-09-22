@@ -96,6 +96,14 @@ const Login = () => {
 
         await setDoc(doc(db, "drivers", uid), driverData);
 
+        console.log("✅ Driver document created:", {
+          uid,
+          name,
+          email,
+          verified: driverData.verified,
+          createdAt: driverData.createdAt
+        });
+
         if (isAdmin) {
           localStorage.setItem("driver", JSON.stringify(driverData));
           toast.success("Registered successfully as Admin!");

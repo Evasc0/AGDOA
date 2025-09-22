@@ -184,13 +184,20 @@ const Admin = () => {
           ...doc.data(),
         })) as Driver[];
 
-        console.log("All drivers fetched:", allDrivers);
+        console.log("🔥 Firestore snapshot received - Total drivers:", snap.docs.length);
+        console.log("📋 All drivers data:", allDrivers.map(d => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          verified: d.verified,
+          createdAt: d.createdAt
+        })));
 
         const verifiedDrivers = allDrivers.filter((d) => d.verified === true);
         const pending = allDrivers.filter((d) => d.verified === false);
 
-        console.log("Verified drivers:", verifiedDrivers);
-        console.log("Pending drivers:", pending);
+        console.log("✅ Verified drivers:", verifiedDrivers.length, verifiedDrivers.map(d => ({ id: d.id, name: d.name, verified: d.verified })));
+        console.log("⏳ Pending drivers:", pending.length, pending.map(d => ({ id: d.id, name: d.name, verified: d.verified })));
 
         setDrivers(verifiedDrivers);
         setPendingDrivers(pending);
@@ -198,12 +205,13 @@ const Admin = () => {
         // Notify admin of new pending registration requests
         if (pending.length > prevPendingCount.current) {
           const newRequests = pending.length - prevPendingCount.current;
+          console.log("🔔 New pending requests detected:", newRequests);
           toast(`New pending registration request${newRequests > 1 ? 's' : ''} (${newRequests})`);
         }
         prevPendingCount.current = pending.length;
       },
       (error) => {
-        console.error("Error fetching drivers:", error);
+        console.error("❌ Error fetching drivers:", error);
         toast.error("Error fetching drivers: " + error.message);
       }
     );
