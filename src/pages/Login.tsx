@@ -22,10 +22,12 @@ const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [name, setName] = useState("");
   const [plate, setPlate] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -50,6 +52,27 @@ const Login = () => {
     }
   }, [navigate]);
 
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 6) {
+      setPasswordError("Password must contain at least 6 characters");
+      return false;
+    } else {
+      setPasswordError("");
+      return true;
+    }
+  };
+
+  const validatePhone = (phoneNumber: string) => {
+    const phoneRegex = /^\d{11}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      setPhoneError("Phone number must contain 11 digits");
+      return false;
+    } else {
+      setPhoneError("");
+      return true;
+    }
+  };
+
   const handleAuth = async () => {
     if (
       !email ||
@@ -57,6 +80,14 @@ const Login = () => {
       (isSignUp && (!name || !plate || !vehicle || !phone))
     ) {
       toast.error("Please fill all fields.");
+      return;
+    }
+
+    // Validate password and phone before proceeding
+    if (!validatePassword(password)) {
+      return;
+    }
+    if (isSignUp && !validatePhone(phone)) {
       return;
     }
 
@@ -109,9 +140,8 @@ const Login = () => {
           toast.success("Registered successfully as Admin!");
           setTimeout(() => navigate("/admin"), 1000);
         } else {
-          toast.success(
-            "Registration complete! Please wait for admin approval before logging in."
-          );
+          toast.success("Your account has been created! Please wait for admin approval.");
+          toast.success("You can only log in when the admin approves your account.");
           // Do not auto-login unverified users
           // Clear form fields
           setEmail("");
@@ -236,23 +266,29 @@ const Login = () => {
         />
 
         <div className="relative mb-3">
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Password"
-            className="w-full p-2 bg-gray-700 rounded pr-10"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-          />
-          <button
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2 top-2 text-sm text-gray-400 hover:text-white"
-            type="button"
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
-        </div>
+        <input
+          type={showPassword ? "text" : "password"}
+          placeholder="Password"
+          className="w-full p-2 bg-gray-700 rounded pr-10"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            validatePassword(e.target.value);
+          }}
+          autoComplete={isSignUp ? "new-password" : "current-password"}
+        />
+        <button
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-2 top-2 text-sm text-gray-400 hover:text-white"
+          type="button"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? "Hide" : "Show"}
+        </button>
+      </div>
+      {passwordError && (
+        <p className="text-red-500 text-sm mb-3">{passwordError}</p>
+      )}
 
         {isSignUp && (
           <>
@@ -284,9 +320,15 @@ const Login = () => {
                 placeholder="Phone Number (e.g., 09123456789)"
                 className="flex-1 p-2 bg-gray-700 rounded"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  validatePhone(e.target.value);
+                }}
                 autoComplete="tel"
               />
+              {phoneError && (
+                <p className="text-red-500 text-sm mt-1">{phoneError}</p>
+              )}
             </div>
           </>
         )}
