@@ -382,7 +382,7 @@ const Admin = () => {
       await setDoc(doc(db, "queues", driver.id), {
         driverId: driver.id,
         name: driver.name,
-        plate: driver.plate,
+        plateNumber: driver.plate,
         joinedAt: serverTimestamp(),
         order: queue.length,
       });
@@ -619,12 +619,25 @@ const Admin = () => {
                       >
                         Reset
                       </button>
-                      <button
-                        onClick={() => addToQueue(driver)}
-                        className="text-green-400"
-                      >
-                        Add to Queue
-                      </button>
+                      {queue.some(q => q.driverId === driver.id) ? (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to remove ${driver.name} from the queue?`)) {
+                              removeFromQueue(driver.id);
+                            }
+                          }}
+                          className="text-red-400"
+                        >
+                          Remove from Queue
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => addToQueue(driver)}
+                          className="text-green-400"
+                        >
+                          Add to Queue
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -665,7 +678,7 @@ const Admin = () => {
       {/* QUEUE */}
       {tab === "queue" && (
         <div className="bg-gray-800 p-4 rounded mt-4">
-          <h2 className="text-lg font-bold mb-2">Driver Queue (Drag to Reorder)</h2>
+          <h2 className="text-lg font-bold mb-2">Driver Queue</h2>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -688,17 +701,29 @@ const Admin = () => {
                       <span>
                         {driver?.name ?? entry.name} ({driver?.plate ?? entry.plate})
                       </span>
-                      <span
-                        className={`ml-4 text-sm font-medium ${
-                          status === "In Queue"
-                            ? "text-green-400"
-                            : status === "Left the queue (In Ride)"
-                            ? "text-yellow-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            status === "In Queue"
+                              ? "text-green-400"
+                              : status === "Left the queue (In Ride)"
+                              ? "text-yellow-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {status}
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to remove ${entry.name} from the queue?`)) {
+                              removeFromQueue(entry.driverId);
+                            }
+                          }}
+                          className="text-red-400"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </li>
                   );
                 })}
