@@ -148,6 +148,10 @@ const Admin = () => {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalRides, setTotalRides] = useState(0);
 
+  const [destinationHistory, setDestinationHistory] = useState<any[]>([]);
+  const [showDestinationHistory, setShowDestinationHistory] = useState(false);
+  const [loadingDestinationHistory, setLoadingDestinationHistory] = useState(false);
+
   // Keep track of driverId timers to set offline after 1 min if they don't return to queue
   const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map()
@@ -531,6 +535,22 @@ const Admin = () => {
     }
   };
 
+  // Fetch destination history
+  const fetchDestinationHistory = async () => {
+    setLoadingDestinationHistory(true);
+    try {
+      const ridesQuery = query(collection(db, "ride_logs"), orderBy("startedAt", "desc"));
+      const ridesSnap = await getDocs(ridesQuery);
+      const rides = ridesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      setDestinationHistory(rides);
+      setShowDestinationHistory(true);
+    } catch (error: any) {
+      toast.error("Failed to fetch destination history: " + error.message);
+    } finally {
+      setLoadingDestinationHistory(false);
+    }
+  };
+
   // Fetch analytics when tab changes to analytics or filter changes
   useEffect(() => {
     if (tab === "analytics" && user) {
@@ -756,7 +776,14 @@ const Admin = () => {
       {tab === "history" && (
         <div className="mt-4 bg-gray-800 p-4 rounded">
           <h2 className="text-lg font-bold mb-2">Driver History</h2>
-                    <div className="overflow-y-auto max-h-[400px] space-y-2">
+          <button
+            onClick={fetchDestinationHistory}
+            disabled={loadingDestinationHistory}
+            className="mb-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loadingDestinationHistory ? "Loading..." : "View Destination History"}
+          </button>
+          <div className="overflow-y-auto max-h-[400px] space-y-2">
             {drivers.map((driver) => (
               <div key={driver.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
@@ -766,6 +793,41 @@ const Admin = () => {
               </div>
             ))}
           </div>
+          {showDestinationHistory && (
+            <div className="mt-4">
+              <h3 className="text-md font-semibold mb-2">Destination History (Chronological)</h3>
+              {destinationHistory.length === 0 ? (
+                <p className="text-gray-400">No rides found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm bg-gray-700 rounded overflow-hidden">
+                    <thead>
+                      <tr className="bg-gray-600 text-left">
+                        <th className="p-2">Driver Name</th>
+                        <th>Plate Number</th>
+                        <th>Destination</th>
+                        <th>Date and Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {destinationHistory.map((ride) => {
+                        const driver = drivers.find(d => d.id === ride.driverId);
+                        const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+                        return (
+                          <tr key={ride.id} className="border-t border-gray-600">
+                            <td className="p-2">{driver?.name || "Unknown Driver"}</td>
+                            <td>{driver?.plate || "N/A"}</td>
+                            <td>{ride.dropoffName}</td>
+                            <td>{startedAt.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
