@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fareMatrix } from "../utils/fareMatrix";
 import { useRide } from "../components/RideContext";
 
-const AVERAGE_WAIT_TIME_PER_DRIVER = 5; // in minutes
+const AVERAGE_WAIT_TIME_PER_DRIVER = 20; // in minutes
 
 const Home = () => {
   const navigate = useNavigate();
