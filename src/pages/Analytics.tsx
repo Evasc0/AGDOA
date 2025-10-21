@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
 import { fareMatrix } from '../utils/fareMatrix';
+import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
 // Register Chart.js components
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement);
@@ -66,6 +67,12 @@ const Analytics: React.FC = () => {
   >([]);
   const [filter, setFilter] = useState<'weekly' | 'monthly' | 'annually'>('weekly');
   const [pieStats, setPieStats] = useState<{ label: string; earnings: number; rides: number }[]>([]);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [customFilter, setCustomFilter] = useState(false);
 
   // Fetch 7-day weather forecast
   const fetchWeather = useCallback(() => {
@@ -217,20 +224,33 @@ const Analytics: React.FC = () => {
 }, [user]);
 
   // Fetch data for pie chart based on filter
-  const fetchPie = useCallback(async (selectedFilter: 'weekly' | 'monthly' | 'annually') => {
+  const fetchPie = useCallback(async (selectedFilter: 'weekly' | 'monthly' | 'annually', customStart?: Date | null, customEnd?: Date | null) => {
     if (!user) return;
 
     try {
+      let startDate: Date;
+      let endDate: Date;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const daysBack = selectedFilter === 'annually' ? 365 : selectedFilter === 'monthly' ? 30 : 7;
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - (daysBack - 1));
+
+      if (customStart && customEnd) {
+        startDate = new Date(customStart);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(customEnd);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        const daysBack = selectedFilter === 'annually' ? 365 : selectedFilter === 'monthly' ? 30 : 7;
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - (daysBack - 1));
+        endDate = new Date(today);
+        endDate.setHours(23, 59, 59, 999);
+      }
 
       const q = query(
         collection(db, 'ride_logs'),
         where('driverId', '==', user.uid),
-        where('timestamp', '>=', Timestamp.fromDate(startDate))
+        where('timestamp', '>=', Timestamp.fromDate(startDate)),
+        where('timestamp', '<=', Timestamp.fromDate(endDate))
       );
 
       const snapshot = await getDocs(q);
@@ -238,7 +258,8 @@ const Analytics: React.FC = () => {
       let statMap: Record<string, { earnings: number; rides: number; date: Date }> = {};
 
       // Initialize statMap for the period
-      for (let i = 0; i < daysBack; i++) {
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      for (let i = 0; i < daysDiff; i++) {
         const d = new Date(startDate.getTime() + i * 86400000);
         const label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
         statMap[label] = { earnings: 0, rides: 0, date: d };
@@ -269,7 +290,12 @@ const Analytics: React.FC = () => {
       // Aggregate based on filter
       let aggregated: Record<string, { earnings: number; rides: number }> = {};
 
-      if (selectedFilter === 'weekly') {
+      if (customStart && customEnd) {
+        // For custom filter, use daily
+        Object.entries(statMap).forEach(([label, data]) => {
+          aggregated[label] = data;
+        });
+      } else if (selectedFilter === 'weekly') {
         // For weekly, use daily
         Object.entries(statMap).forEach(([label, data]) => {
           aggregated[label] = data;
@@ -459,25 +485,47 @@ const Analytics: React.FC = () => {
           <h2 className="text-lg font-semibold">📊 Ride & Earnings Breakdown</h2>
           <div className="flex space-x-2">
             <button
-              onClick={() => setFilter('weekly')}
+              onClick={() => {
+                setIsFilterModalOpen(true);
+              }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'weekly' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Filter
+            </button>
+            <button
+              onClick={() => {
+                setFilter('weekly');
+                setCustomFilter(false);
+                fetchPie('weekly');
+              }}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                filter === 'weekly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               Weekly
             </button>
             <button
-              onClick={() => setFilter('monthly')}
+              onClick={() => {
+                setFilter('monthly');
+                setCustomFilter(false);
+                fetchPie('monthly');
+              }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'monthly' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                filter === 'monthly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               Monthly
             </button>
             <button
-              onClick={() => setFilter('annually')}
+              onClick={() => {
+                setFilter('annually');
+                setCustomFilter(false);
+                fetchPie('annually');
+              }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'annually' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                filter === 'annually' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
               Annually
@@ -536,6 +584,20 @@ const Analytics: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {isFilterModalOpen && (
+        <AnalyticsFilterModal
+          isOpen={isFilterModalOpen}
+          onClose={() => setIsFilterModalOpen(false)}
+          onApply={(start, end) => {
+            setStartDate(start);
+            setEndDate(end);
+            setCustomFilter(true);
+            fetchPie('weekly', start, end);
+            setIsFilterModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

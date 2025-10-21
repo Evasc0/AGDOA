@@ -1,35 +1,22 @@
 // src/components/AnalyticsFilterModal.tsx
-import React from 'react';
+import React, { useState } from 'react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onApply: () => void;
-  onClear: () => void;
-  startDate: Date | null;
-  setStartDate: (date: Date | null) => void;
-  endDate: Date | null;
-  setEndDate: (date: Date | null) => void;
-  selectedMonth: number | null;
-  setSelectedMonth: (month: number | null) => void;
-  selectedYear: number | null;
-  setSelectedYear: (year: number | null) => void;
+  onApply: (start: Date | null, end: Date | null) => void;
 }
 
 const AnalyticsFilterModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onApply,
-  onClear,
-  startDate,
-  setStartDate,
-  endDate,
-  setEndDate,
-  selectedMonth,
-  setSelectedMonth,
-  selectedYear,
-  setSelectedYear,
 }) => {
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
   if (!isOpen) return null;
 
   const currentYear = new Date().getFullYear();
@@ -158,7 +145,12 @@ const AnalyticsFilterModal: React.FC<Props> = ({
 
         <div className="flex justify-between mt-6">
           <button
-            onClick={onClear}
+            onClick={() => {
+              setStartDate(null);
+              setEndDate(null);
+              setSelectedMonth(null);
+              setSelectedYear(null);
+            }}
             className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded"
           >
             Clear
@@ -171,7 +163,15 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               Cancel
             </button>
             <button
-              onClick={onApply}
+              onClick={() => {
+                let finalStart = startDate;
+                let finalEnd = endDate;
+                if (selectedMonth !== null && selectedYear !== null) {
+                  finalStart = new Date(selectedYear, selectedMonth, 1);
+                  finalEnd = new Date(selectedYear, selectedMonth + 1, 0);
+                }
+                onApply(finalStart, finalEnd);
+              }}
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded"
             >
               Apply
