@@ -38,7 +38,7 @@ const RideHistoryCard: React.FC<Props> = ({ log }) => {
 
       {/* Distance and Duration formatted */}
       <p className="mb-1">
-        Distance: {log.travelTimeMinutes > 0 ? log.travelTimeMinutes : 0} km &middot; Duration: {log.travelTimeMinutes} mins
+        Distance: {log.travelTimeMinutes > 0 ? (log.travelTimeMinutes * (25 / 60)).toFixed(2) : 0} km &middot; Duration: {log.travelTimeMinutes} mins
       </p>
 
     
