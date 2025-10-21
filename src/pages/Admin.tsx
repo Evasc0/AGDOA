@@ -23,6 +23,7 @@ import {
 } from "firebase/auth";
 import toast from "react-hot-toast";
 import EditDriverModal from "../components/EditDriverModal";
+import AnalyticsFilterModal from "../components/AnalyticsFilterModal";
 
 import {
   DndContext,
@@ -76,6 +77,8 @@ interface Driver {
   createdAt?: any;
   verified?: boolean;
   phone?: string;
+  leftAt?: any;
+  selectedDestination?: string;
 }
 
 interface QueueEntry {
@@ -136,21 +139,29 @@ const Admin = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<
-    "drivers" | "logs" | "queue" | "history" | "pending" | "analytics"
+    "drivers" | "logs" | "queue" | "status" | "history" | "pending" | "analytics"
   >("drivers");
 
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
-  const [analyticsFilter, setAnalyticsFilter] = useState<'daily' | 'weekly' | 'monthly' | 'annually'>('weekly');
+  const [analyticsFilter, setAnalyticsFilter] = useState<'daily' | 'weekly' | 'monthly' | 'annually' | 'custom'>('weekly');
   const [allPieStats, setAllPieStats] = useState<{ label: string; earnings: number; rides: number }[]>([]);
   const [driverPieStats, setDriverPieStats] = useState<Record<string, { label: string; earnings: number; rides: number }[]>>({});
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalRides, setTotalRides] = useState(0);
 
+  const [showAnalyticsFilterModal, setShowAnalyticsFilterModal] = useState(false);
+  const [analyticsStartDate, setAnalyticsStartDate] = useState<Date | null>(null);
+  const [analyticsEndDate, setAnalyticsEndDate] = useState<Date | null>(null);
+  const [analyticsSelectedMonth, setAnalyticsSelectedMonth] = useState<number | null>(null);
+  const [analyticsSelectedYear, setAnalyticsSelectedYear] = useState<number | null>(null);
+
   const [destinationHistory, setDestinationHistory] = useState<any[]>([]);
   const [showDestinationHistory, setShowDestinationHistory] = useState(false);
   const [loadingDestinationHistory, setLoadingDestinationHistory] = useState(false);
+  const [activeRides, setActiveRides] = useState<any[]>([]);
+  const [pieColors, setPieColors] = useState<string[]>([]);
 
   // Keep track of driverId timers to set offline after 1 min if they don't return to queue
   const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -255,9 +266,9 @@ const Admin = () => {
           const driverSnap = await getDoc(driverRef);
           if (driverSnap.exists() && driverSnap.data().status === "offline") continue;
 
-          // Update Firestore status to "in ride"
+          // Update Firestore status to "in ride" and set leftAt timestamp
           try {
-            await setDoc(driverRef, { status: "in ride" }, { merge: true });
+            await setDoc(driverRef, { status: "in ride", leftAt: serverTimestamp() }, { merge: true });
           } catch (error: any) {
             toast.error(
               "Failed to update driver status to Left the queue (In Ride): " +
@@ -305,9 +316,25 @@ const Admin = () => {
       }
     );
 
+    // Listen to active rides (ride_logs where status != "completed")
+    const activeRidesQuery = query(collection(db, "ride_logs"), where("status", "!=", "completed"));
+    const unsubActiveRides = onSnapshot(
+      activeRidesQuery,
+      (snap) => {
+        const rides = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as any[];
+        setActiveRides(rides);
+      },
+      (error) => {
+        console.error("Error fetching active rides:", error);
+      }
+    );
+
     // Listen to admin access logs
     const unsubLogs = onSnapshot(
-      collection(db, "adminAccessLogs"),
+      query(collection(db, "adminAccessLogs"), orderBy("timestamp", "desc")),
       (snap) => {
         setLogs(
           snap.docs.map((doc) => ({
@@ -324,6 +351,7 @@ const Admin = () => {
     return () => {
       unsubDrivers();
       unsubQueue();
+      unsubActiveRides();
       unsubLogs();
       // Clear all timers on unmount
       offlineTimers.current.forEach((timer) => clearTimeout(timer));
@@ -365,6 +393,13 @@ const Admin = () => {
     try {
       await deleteDoc(doc(db, "drivers", id));
       toast.success("Driver deleted");
+      // Log the action
+      const driver = drivers.find(d => d.id === id);
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Deleted driver: ${driver?.name} (${driver?.plate})`,
+        timestamp: serverTimestamp(),
+      });
     } catch (error: any) {
       toast.error("Error deleting driver");
     }
@@ -375,6 +410,12 @@ const Admin = () => {
     try {
       await sendPasswordResetEmail(auth, email);
       toast.success("Password reset email sent");
+      // Log the action
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Sent password reset email to: ${email}`,
+        timestamp: serverTimestamp(),
+      });
     } catch (error: any) {
       toast.error("Error sending reset email");
     }
@@ -391,6 +432,12 @@ const Admin = () => {
         order: queue.length,
       });
       toast.success(`${driver.name} added to queue`);
+      // Log the action
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Added driver to queue: ${driver.name} (${driver.plate})`,
+        timestamp: serverTimestamp(),
+      });
     } catch (error: any) {
       toast.error("Failed to add to queue: " + error.message);
     }
@@ -401,6 +448,13 @@ const Admin = () => {
     try {
       await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
+      // Log the action
+      const driver = drivers.find(d => d.id === id);
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Removed driver from queue: ${driver?.name} (${driver?.plate})`,
+        timestamp: serverTimestamp(),
+      });
     } catch (error: any) {
       toast.error("Failed to remove from queue: " + error.message);
     }
@@ -464,27 +518,36 @@ const Admin = () => {
       const now = new Date();
       let startDate: Date;
 
-      switch (analyticsFilter) {
-        case 'daily':
-          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          break;
-        case 'weekly':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'monthly':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-          break;
-        case 'annually':
-          startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-          break;
-        default:
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      }
+      let filteredRides: any[] = [];
 
-      const filteredRides = rides.filter(ride => {
-        const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
-        return rideDate >= startDate;
-      });
+      if (analyticsFilter === 'custom' && analyticsStartDate && analyticsEndDate) {
+        filteredRides = rides.filter(ride => {
+          const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
+          return rideDate >= analyticsStartDate && rideDate <= analyticsEndDate;
+        });
+      } else {
+        switch (analyticsFilter) {
+          case 'daily':
+            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            break;
+          case 'weekly':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'monthly':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            break;
+          case 'annually':
+            startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            break;
+          default:
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        }
+
+        filteredRides = rides.filter(ride => {
+          const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
+          return rideDate >= startDate;
+        });
+      }
 
       // Calculate per-driver stats first
       const driverStats: Record<string, { label: string; earnings: number; rides: number }[]> = {};
@@ -525,7 +588,16 @@ const Admin = () => {
         return { label: driver.name, earnings, rides };
       }).filter(Boolean) as { label: string; earnings: number; rides: number }[];
 
-      setAllPieStats(driverPieData);
+      // Sort pie stats by earnings descending for color synchronization
+      const sortedPieStats = [...driverPieData].sort((a, b) => b.earnings - a.earnings);
+      setAllPieStats(sortedPieStats);
+
+      // Generate pie colors from green (highest earnings) to red (lowest earnings)
+      const pieColors = sortedPieStats.map((_, index) => {
+        const hue = sortedPieStats.length > 1 ? 120 - (index / (sortedPieStats.length - 1)) * 120 : 120;
+        return `hsl(${hue}, 70%, 50%)`;
+      });
+      setPieColors(pieColors);
 
       setDriverPieStats(driverStats);
       setTotalEarnings(totalEarnings);
@@ -558,12 +630,32 @@ const Admin = () => {
     }
   }, [tab, analyticsFilter, user]);
 
+  // Handlers for AnalyticsFilterModal
+  const handleApplyAnalyticsFilter = () => {
+    setAnalyticsFilter('custom');
+    setShowAnalyticsFilterModal(false);
+    fetchAnalytics();
+  };
+
+  const handleClearAnalyticsFilter = () => {
+    setAnalyticsFilter('weekly');
+    setAnalyticsStartDate(null);
+    setAnalyticsEndDate(null);
+    setAnalyticsSelectedMonth(null);
+    setAnalyticsSelectedYear(null);
+    setShowAnalyticsFilterModal(false);
+    fetchAnalytics();
+  };
+
   return (
-    <div className="p-4 max-w-6xl mx-auto text-white">
+    <div className="p-4 max-w-6xl mx-auto text-white bg-gray-900">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h1 className="text-xl font-bold">Admin Panel</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold">Admin Panel</h1>
+          <span className="text-lg text-gray-300">{new Date().toLocaleDateString('en-US', { month: 'long' }) + ': ' + new Date().getDate() + ', ' + new Date().getFullYear()}</span>
+        </div>
         <div className="flex gap-2 items-center flex-wrap">
-          {["drivers", "queue", "logs", "history", "pending", "analytics"].map((type) => (
+          {["drivers", "queue", "status", "logs", "history", "pending", "analytics"].map((type) => (
             <button
               key={type}
               onClick={() => setTab(type as any)}
@@ -600,9 +692,9 @@ const Admin = () => {
           />
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm bg-gray-800 rounded overflow-hidden">
+<table className="w-full text-sm bg-gray-800 rounded overflow-hidden">
               <thead>
-                <tr className="bg-gray-700 text-left">
+<tr className="bg-gray-700 text-left">
                   <th className="p-2">Name</th>
                   <th>Plate</th>
                   <th>Status</th>
@@ -664,40 +756,12 @@ const Admin = () => {
               </tbody>
             </table>
           </div>
-
-          {/* Driver Status Section */}
-          <div className="mt-6 bg-gray-800 p-4 rounded">
-            <h2 className="text-lg font-bold mb-2">Driver Status</h2>
-            <ul className="space-y-2">
-              {drivers.map((driver) => (
-                <li
-                  key={driver.id}
-                  className="flex justify-between items-center bg-gray-700 p-2 rounded"
-                >
-                  <span>
-                    {driver.name} ({driver.plate}) -{" "}
-                    <span
-                      className={`font-semibold ${
-                        getDriverStatus(driver.id) === "In Queue"
-                          ? "text-green-400"
-                          : getDriverStatus(driver.id) === "Left the queue (In Ride)"
-                          ? "text-yellow-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {getDriverStatus(driver.id)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
         </>
       )}
 
       {/* QUEUE */}
       {tab === "queue" && (
-        <div className="bg-gray-800 p-4 rounded mt-4">
+        <div className="bg-gray-800 p-4 rounded mt-4 border border-gray-700">
           <h2 className="text-lg font-bold mb-2">Driver Queue</h2>
           <DndContext
             sensors={sensors}
@@ -753,21 +817,112 @@ const Admin = () => {
         </div>
       )}
 
+      {/* STATUS */}
+      {tab === "status" && (
+        <div className="mt-4 bg-gray-800 p-4 rounded">
+          <h2 className="text-lg font-bold mb-4">Driver Status</h2>
+
+          {/* In Queue */}
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-2 text-green-400">In Queue</h3>
+            <ul className="space-y-2">
+              {drivers
+                .filter((driver) => driver.status === "waiting")
+                .sort((a, b) => {
+                  const aJoined = queue.find((q) => q.driverId === a.id)?.joinedAt?.seconds || 0;
+                  const bJoined = queue.find((q) => q.driverId === b.id)?.joinedAt?.seconds || 0;
+                  return aJoined - bJoined;
+                })
+                .map((driver) => (
+                  <li
+                    key={driver.id}
+                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                  >
+                    <span>
+                      {driver.name} ({driver.plate}) -{" "}
+                      <span className="font-semibold text-green-400">In Queue</span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+
+          {/* In Ride */}
+          <div className="mb-6">
+            <h3 className="text-md font-semibold mb-2 text-yellow-400">In Ride</h3>
+            <ul className="space-y-2">
+              {drivers
+                .filter((driver) => driver.status === "in ride")
+                .sort((a, b) => {
+                  const aLeft = a.leftAt?.seconds || 0;
+                  const bLeft = b.leftAt?.seconds || 0;
+                  return aLeft - bLeft;
+                })
+                .map((driver) => {
+                  const destination = driver.selectedDestination || "Unknown";
+                  const leftTime = formatTime(driver.leftAt?.seconds);
+                  return (
+                    <li
+                      key={driver.id}
+                      className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                    >
+                      <span>
+                        {driver.name} ({driver.plate}) -{" "}
+                        <span className="font-semibold text-yellow-400">
+                          In route to {destination}
+                        </span>
+                      </span>
+<span className="text-sm text-gray-400">{leftTime}</span>
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
+
+          {/* Offline */}
+          <div>
+            <h3 className="text-md font-semibold mb-2 text-red-400">Offline</h3>
+            <ul className="space-y-2">
+              {drivers
+                .filter((driver) => driver.status === "offline")
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((driver) => (
+                  <li
+                    key={driver.id}
+                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                  >
+                    <span>
+                      {driver.name} ({driver.plate}) -{" "}
+                      <span className="font-semibold text-red-400">Offline</span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* LOGS */}
       {tab === "logs" && (
         <div className="mt-4 bg-gray-800 p-4 rounded">
           <h2 className="text-lg font-bold mb-2">Admin Activity Logs</h2>
-          <div className="overflow-y-auto max-h-[400px] space-y-2">
-            {logs.map((log) => (
-              <div key={log.id} className="border-b border-gray-600 py-1">
-                <p className="text-sm">
-                  <strong>{log.email}</strong> —{" "}
-                  {log.accessedAt?.seconds
-                    ? formatTime(log.accessedAt.seconds)
-                    : "No time"}
-                </p>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm bg-gray-800 rounded overflow-hidden">
+              <thead>
+                <tr className="bg-gray-700 text-left">
+                  <th className="p-2">Actions</th>
+                  <th className="p-2">Date and Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-t border-gray-600">
+                    <td className="p-2"><strong>{log.email}</strong>: {log.action}</td>
+                    <td className="p-2">{log.timestamp?.seconds ? formatTime(log.timestamp.seconds) : "No time"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -785,7 +940,7 @@ const Admin = () => {
           </button>
           <div className="overflow-y-auto max-h-[400px] space-y-2">
             {drivers.map((driver) => (
-              <div key={driver.id} className="border-b border-gray-600 py-1">
+<div key={driver.id} className="border-b border-gray-600 py-1">
                 <p className="text-sm">
                   <strong>{driver.name}</strong> — {driver.plate} — Registered on:{" "}
                   {formatTime(driver.createdAt?.seconds)}
@@ -797,7 +952,7 @@ const Admin = () => {
             <div className="mt-4">
               <h3 className="text-md font-semibold mb-2">Destination History (Chronological)</h3>
               {destinationHistory.length === 0 ? (
-                <p className="text-gray-400">No rides found.</p>
+<p className="text-gray-400">No rides found.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm bg-gray-700 rounded overflow-hidden">
@@ -814,7 +969,7 @@ const Admin = () => {
                         const driver = drivers.find(d => d.id === ride.driverId);
                         const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
                         return (
-                          <tr key={ride.id} className="border-t border-gray-600">
+<tr key={ride.id} className="border-t border-gray-600">
                             <td className="p-2">{driver?.name || "Unknown Driver"}</td>
                             <td>{driver?.plate || "N/A"}</td>
                             <td>{ride.dropoffName}</td>
@@ -867,6 +1022,12 @@ const Admin = () => {
                               { merge: true }
                             );
                             toast.success(`Verified ${driver.name}`);
+                            // Log the action
+                            await setDoc(doc(collection(db, "adminAccessLogs")), {
+                              email: user?.email,
+                              action: `Approved driver registration: ${driver.name} (${driver.plate})`,
+                              timestamp: serverTimestamp(),
+                            });
                           } catch (error: any) {
                             toast.error("Failed to verify: " + error.message);
                           }
@@ -880,6 +1041,12 @@ const Admin = () => {
                           try {
                             await deleteDoc(doc(db, "drivers", driver.id));
                             toast.success(`Rejected and deleted ${driver.name}`);
+                            // Log the action
+                            await setDoc(doc(collection(db, "adminAccessLogs")), {
+                              email: user?.email,
+                              action: `Rejected driver registration: ${driver.name} (${driver.plate})`,
+                              timestamp: serverTimestamp(),
+                            });
                           } catch (error: any) {
                             toast.error("Failed to delete: " + error.message);
                           }
@@ -908,13 +1075,21 @@ const Admin = () => {
               <button
                 key={filter}
                 onClick={() => setAnalyticsFilter(filter as any)}
-                className={`px-4 py-2 rounded ${
+className={`px-4 py-2 rounded ${
                   analyticsFilter === filter ? "bg-blue-600" : "bg-gray-700"
                 }`}
               >
                 {filter.charAt(0).toUpperCase() + filter.slice(1)}
               </button>
             ))}
+            <button
+              onClick={() => setShowAnalyticsFilterModal(true)}
+className={`px-4 py-2 rounded ${
+                analyticsFilter === 'custom' ? "bg-blue-600" : "bg-gray-700"
+              }`}
+            >
+              Custom
+            </button>
           </div>
 
           {/* Overall Stats */}
@@ -927,8 +1102,8 @@ const Admin = () => {
                     labels: allPieStats.map(stat => stat.label),
                     datasets: [{
                       data: allPieStats.map(stat => stat.earnings),
-                      backgroundColor: driverColors.slice(0, allPieStats.length),
-                      borderColor: driverColors.slice(0, allPieStats.length),
+                      backgroundColor: pieColors,
+                      borderColor: pieColors,
                       borderWidth: 1,
                     }],
                   }}
@@ -958,26 +1133,37 @@ const Admin = () => {
             <div className="bg-gray-700 p-4 rounded">
               <h3 className="text-md font-semibold mb-2">Driver Performance</h3>
               <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                {drivers.map((driver, index) => {
+                {[...drivers].sort((a, b) => {
+                  const aEarnings = driverPieStats[a.id]?.[1]?.earnings || 0;
+                  const bEarnings = driverPieStats[b.id]?.[1]?.earnings || 0;
+                  return bEarnings - aEarnings;
+                }).map((driver, index, sortedDrivers) => {
                   const driverStats = driverPieStats[driver.id];
                   if (!driverStats || driverStats.length === 0) return null;
 
+                  // Calculate hue from green (120) to red (0) based on index
+                  const hue = sortedDrivers.length > 1 ? 120 - (index / (sortedDrivers.length - 1)) * 120 : 120;
+
                   return (
-                    <div key={driver.id} className={`${driverBgClasses[index % driverBgClasses.length]} p-3 rounded font-medium mb-2`}>
-                      <h4 className="font-medium mb-2">{driver.name} ({driver.plate})</h4>
+                    <div
+                      key={driver.id}
+                      className="p-3 rounded font-medium mb-2"
+                      style={{ backgroundColor: `hsl(${hue}, 70%, 50%)` }}
+                    >
+                      <h4 className="font-medium mb-2 text-white">{driver.name} ({driver.plate})</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <span className="text-gray-300">Rides:</span> {driverStats[0]?.earnings || 0}
+                          <span className="text-white">Rides: {driverStats[0]?.rides || 0}</span>
                         </div>
                         <div>
-                          <span className="text-gray-300">Earnings:</span> ₱{driverStats[1]?.earnings || 0}
+                          <span className="text-white">Earnings: ₱{driverStats[1]?.earnings || 0}</span>
                         </div>
                       </div>
                     </div>
                   );
                 })}
                 {/* Total Summary */}
-                <div className="bg-gray-600 p-3 rounded font-bold border-t border-gray-500">
+<div className="bg-gray-600 p-3 rounded font-bold border-t border-gray-500">
                   <h4 className="mb-2">Total for All Drivers</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -999,6 +1185,24 @@ const Admin = () => {
           driver={selectedDriver}
           onClose={() => setShowModal(false)}
           onSaveSuccess={() => setShowModal(false)}
+          user={user}
+        />
+      )}
+
+      {showAnalyticsFilterModal && (
+        <AnalyticsFilterModal
+          isOpen={showAnalyticsFilterModal}
+          onClose={() => setShowAnalyticsFilterModal(false)}
+          onApply={handleApplyAnalyticsFilter}
+          onClear={handleClearAnalyticsFilter}
+          startDate={analyticsStartDate}
+          setStartDate={setAnalyticsStartDate}
+          endDate={analyticsEndDate}
+          setEndDate={setAnalyticsEndDate}
+          selectedMonth={analyticsSelectedMonth}
+          setSelectedMonth={setAnalyticsSelectedMonth}
+          selectedYear={analyticsSelectedYear}
+          setSelectedYear={setAnalyticsSelectedYear}
         />
       )}
     </div>

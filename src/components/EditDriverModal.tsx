@@ -1,6 +1,6 @@
 // src/components/EditDriverModal.tsx
 import { useState, useEffect } from "react";
-import { doc, updateDoc, getFirestore } from "firebase/firestore";
+import { doc, updateDoc, getFirestore, setDoc, collection, serverTimestamp } from "firebase/firestore";
 import toast from "react-hot-toast";
 import classNames from "classnames";
 
@@ -8,9 +8,10 @@ interface EditDriverModalProps {
   driver: any;
   onClose: () => void;
   onSaveSuccess: () => void;
+  user: any;
 }
 
-const EditDriverModal = ({ driver, onClose, onSaveSuccess }: EditDriverModalProps) => {
+const EditDriverModal = ({ driver, onClose, onSaveSuccess, user }: EditDriverModalProps) => {
   const db = getFirestore();
   const [visible, setVisible] = useState(false);
 
@@ -18,7 +19,7 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess }: EditDriverModalProp
     name: driver.name || "",
     plate: driver.plate || "",
     status: driver.status || "offline",
-    contact: driver.contact || "",
+    contact: driver.phone || "",
     age: driver.age || "",
     paymentNumber: driver.paymentNumber || "",
   });
@@ -59,10 +60,20 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess }: EditDriverModalProp
     try {
       setLoading(true);
       await updateDoc(doc(db, "drivers", driver.id), {
-        ...form,
+        name: form.name,
+        plate: form.plate,
+        status: form.status,
+        phone: form.contact,
         age: parseInt(form.age),
+        paymentNumber: form.paymentNumber,
       });
       toast.success("Driver updated");
+      // Log the action
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Edited driver: ${driver.name} (${driver.plate})`,
+        timestamp: serverTimestamp(),
+      });
       onSaveSuccess();
       handleClose();
     } catch (err) {

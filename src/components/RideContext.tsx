@@ -10,6 +10,7 @@ import {
   orderBy,
   Timestamp,
   addDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { useDriverLocation } from "../hooks/useDriverLocation";
 import { fareMatrix } from "../utils/fareMatrix";
@@ -178,7 +179,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           await deleteDoc(doc(db, "queues", driver.id));
           // Update driver status to "in ride" when leaving queue
-          await setDoc(driverStatusRef, { status: "in ride" }, { merge: true });
+          await setDoc(driverStatusRef, { status: "in ride", leftAt: Timestamp.now() }, { merge: true });
 
           setHasJoined(false);
           setPosition(null);
@@ -428,6 +429,12 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentWaitTimeMinutes(waitMins > 0 ? waitMins : 0);
       } else {
         setCurrentWaitTimeMinutes(0);
+      }
+
+      // Update driver status with selected destination
+      if (driver) {
+        const driverStatusRef = doc(db, "drivers", driver.id);
+        await setDoc(driverStatusRef, { selectedDestination }, { merge: true });
       }
 
       setToastMsg("🚕 Ride started! Please exit paradahan to begin trip.");

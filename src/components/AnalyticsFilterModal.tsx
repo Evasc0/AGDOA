@@ -1,0 +1,186 @@
+// src/components/AnalyticsFilterModal.tsx
+import React from 'react';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onApply: () => void;
+  onClear: () => void;
+  startDate: Date | null;
+  setStartDate: (date: Date | null) => void;
+  endDate: Date | null;
+  setEndDate: (date: Date | null) => void;
+  selectedMonth: number | null;
+  setSelectedMonth: (month: number | null) => void;
+  selectedYear: number | null;
+  setSelectedYear: (year: number | null) => void;
+}
+
+const AnalyticsFilterModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onApply,
+  onClear,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
+  selectedMonth,
+  setSelectedMonth,
+  selectedYear,
+  setSelectedYear,
+}) => {
+  if (!isOpen) return null;
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-gray-900 text-white p-6 rounded-xl w-full max-w-md shadow-lg">
+        <h2 className="text-xl font-bold mb-4">Filter Analytics</h2>
+
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                setStartDate(todayStart);
+                setEndDate(now);
+                setSelectedMonth(null);
+                setSelectedYear(null);
+              }}
+            >
+              Today
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const sevenDaysAgo = new Date(now);
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                setStartDate(sevenDaysAgo);
+                setEndDate(now);
+                setSelectedMonth(null);
+                setSelectedYear(null);
+              }}
+            >
+              Last 7 Days
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                setStartDate(firstDay);
+                setEndDate(now);
+                setSelectedMonth(null);
+                setSelectedYear(null);
+              }}
+            >
+              This Month
+            </button>
+            <button
+              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              onClick={() => {
+                setStartDate(null);
+                setEndDate(null);
+                setSelectedMonth(null);
+                setSelectedYear(null);
+              }}
+            >
+              All Time
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Start Date</label>
+            <input
+              type="date"
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              value={startDate ? startDate.toISOString().split('T')[0] : ''}
+              onChange={(e) =>
+                setStartDate(e.target.value ? new Date(e.target.value) : null)
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">End Date</label>
+            <input
+              type="date"
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              value={endDate ? endDate.toISOString().split('T')[0] : ''}
+              onChange={(e) =>
+                setEndDate(e.target.value ? new Date(e.target.value) : null)
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Month</label>
+            <select
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              value={selectedMonth ?? ''}
+              onChange={(e) =>
+                setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)
+              }
+            >
+              <option value="">Select Month</option>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i} value={i}>
+                  {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Year</label>
+            <select
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              value={selectedYear ?? ''}
+              onChange={(e) =>
+                setSelectedYear(e.target.value ? parseInt(e.target.value) : null)
+              }
+            >
+              <option value="">Select Year</option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-between mt-6">
+          <button
+            onClick={onClear}
+            className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded"
+          >
+            Clear
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onApply}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AnalyticsFilterModal;
