@@ -5,12 +5,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onApply: (start: Date | null, end: Date | null) => void;
+  onClear?: () => void;
 }
 
 const AnalyticsFilterModal: React.FC<Props> = ({
   isOpen,
   onClose,
   onApply,
+  onClear,
 }) => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -150,6 +152,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               setEndDate(null);
               setSelectedMonth(null);
               setSelectedYear(null);
+              if (onClear) onClear();
             }}
             className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded"
           >

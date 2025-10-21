@@ -154,8 +154,7 @@ const Admin = () => {
   const [showAnalyticsFilterModal, setShowAnalyticsFilterModal] = useState(false);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<Date | null>(null);
   const [analyticsEndDate, setAnalyticsEndDate] = useState<Date | null>(null);
-  const [analyticsSelectedMonth, setAnalyticsSelectedMonth] = useState<number | null>(null);
-  const [analyticsSelectedYear, setAnalyticsSelectedYear] = useState<number | null>(null);
+  const [selectedDailyDate, setSelectedDailyDate] = useState<Date>(new Date());
 
   const [destinationHistory, setDestinationHistory] = useState<any[]>([]);
   const [showDestinationHistory, setShowDestinationHistory] = useState(false);
@@ -522,7 +521,7 @@ const Admin = () => {
 
       if (analyticsFilter === 'custom' && analyticsStartDate && analyticsEndDate) {
         filteredRides = rides.filter(ride => {
-          const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
+          const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
           return rideDate >= analyticsStartDate && rideDate <= analyticsEndDate;
         });
       } else {
@@ -544,7 +543,7 @@ const Admin = () => {
         }
 
         filteredRides = rides.filter(ride => {
-          const rideDate = ride.timestamp?.toDate ? ride.timestamp.toDate() : new Date(ride.timestamp?.seconds * 1000);
+          const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
           return rideDate >= startDate;
         });
       }
@@ -628,10 +627,12 @@ const Admin = () => {
     if (tab === "analytics" && user) {
       fetchAnalytics();
     }
-  }, [tab, analyticsFilter, user]);
+  }, [tab, analyticsFilter, user, selectedDailyDate]);
 
   // Handlers for AnalyticsFilterModal
-  const handleApplyAnalyticsFilter = () => {
+  const handleApplyAnalyticsFilter = (start: Date | null, end: Date | null) => {
+    setAnalyticsStartDate(start);
+    setAnalyticsEndDate(end);
     setAnalyticsFilter('custom');
     setShowAnalyticsFilterModal(false);
     fetchAnalytics();
@@ -641,8 +642,6 @@ const Admin = () => {
     setAnalyticsFilter('weekly');
     setAnalyticsStartDate(null);
     setAnalyticsEndDate(null);
-    setAnalyticsSelectedMonth(null);
-    setAnalyticsSelectedYear(null);
     setShowAnalyticsFilterModal(false);
     fetchAnalytics();
   };
@@ -1195,14 +1194,6 @@ className={`px-4 py-2 rounded ${
           onClose={() => setShowAnalyticsFilterModal(false)}
           onApply={handleApplyAnalyticsFilter}
           onClear={handleClearAnalyticsFilter}
-          startDate={analyticsStartDate}
-          setStartDate={setAnalyticsStartDate}
-          endDate={analyticsEndDate}
-          setEndDate={setAnalyticsEndDate}
-          selectedMonth={analyticsSelectedMonth}
-          setSelectedMonth={setAnalyticsSelectedMonth}
-          selectedYear={analyticsSelectedYear}
-          setSelectedYear={setAnalyticsSelectedYear}
         />
       )}
     </div>
