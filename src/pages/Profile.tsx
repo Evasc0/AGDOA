@@ -45,6 +45,10 @@ const Profile = () => {
         setImage(data.image || null);
         setPaymentMethod(data.paymentMethod || "GCash");
         setPaymentNumber(data.paymentNumber || "");
+
+        // Sync to publicProfiles for QR code access
+        const publicRef = doc(db, "publicProfiles", user.uid);
+        await setDoc(publicRef, data);
       }
     };
 

@@ -156,7 +156,7 @@ const App = () => {
         />
 
         {/* Public route for viewing driver profiles (accessible without login) */}
-        <Route path="/driver/:id" element={<DriverPublicProfile />} />
+        <Route path="/driver/:driverId" element={<DriverPublicProfile />} />
 
         {/* Protected routes, accessible only if authenticated */}
         {isAuthenticated && (

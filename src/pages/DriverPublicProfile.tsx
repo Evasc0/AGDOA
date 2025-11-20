@@ -17,19 +17,19 @@ interface Driver {
 }
 
 const DriverProfilePublic = () => {
-  const { id } = useParams<{ id: string }>();
+  const { driverId } = useParams<{ driverId: string }>();
   const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDriver = async () => {
-      if (!id) {
+      if (!driverId) {
         setLoading(false);
-        return; // Exit if id is undefined
+        return; // Exit if driverId is undefined
       }
 
       try {
-        const docRef = doc(db, "publicProfiles", id); // Fetch from publicProfiles
+        const docRef = doc(db, "publicProfiles", driverId); // Fetch from publicProfiles
         const snapshot = await getDoc(docRef);
         if (snapshot.exists()) {
           setDriver(snapshot.data() as Driver); // Cast to Driver type
@@ -44,7 +44,7 @@ const DriverProfilePublic = () => {
     };
 
     fetchDriver();
-  }, [id]);
+  }, [driverId]);
 
   if (loading) {
     return (
@@ -65,7 +65,7 @@ const DriverProfilePublic = () => {
     );
   }
 
-  const profileUrl = `${window.location.origin}/driver/${id}`;
+  const profileUrl = `${window.location.origin}/driver/${driverId}`;
 
   return (
     <div className="flex justify-center p-4 bg-gray-900 min-h-screen text-white">
