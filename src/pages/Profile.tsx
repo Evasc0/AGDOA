@@ -88,6 +88,11 @@ const Profile = () => {
 
     const ref = doc(db, "drivers", user.uid);
     await updateDoc(ref, updated);
+
+    // Also save to publicProfiles for QR code access
+    const publicRef = doc(db, "publicProfiles", user.uid);
+    await setDoc(publicRef, updated);
+
     setDriver(updated);
     setEditing(false);
     toast.success("Profile updated!");
