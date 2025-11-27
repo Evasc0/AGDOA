@@ -34,23 +34,7 @@ const Login = () => {
 
   const navigate = useNavigate();
 
-  // Auto-redirect if already logged in and verified
-  useEffect(() => {
-    const stored = localStorage.getItem("driver");
-    if (stored) {
-      const data = JSON.parse(stored);
-      if (
-        data.email &&
-        ADMIN_EMAILS.some(
-          (adminEmail) => adminEmail.toLowerCase() === data.email.toLowerCase()
-        )
-      ) {
-        navigate("/admin");
-      } else {
-        navigate("/home");
-      }
-    }
-  }, [navigate]);
+  // Removed auto-redirect to prevent navigation throttling; App.tsx handles routing
 
   const validatePassword = (pwd: string) => {
     if (pwd.length < 6) {

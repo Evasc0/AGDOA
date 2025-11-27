@@ -61,8 +61,7 @@ const App = () => {
           setPostLoginLoading(true);
           setVerified(true); // Admins are always verified
           setTimeout(() => {
-            toast.success("✅ Welcome, Admin!");
-            setTimeout(() => setPostLoginLoading(false), 1000); // Show main content after toast
+            setPostLoginLoading(false); // Show main content after animation
           }, 2000); // Show animation for 2 seconds
 
           // Set localStorage for admin
@@ -87,8 +86,7 @@ const App = () => {
                 setPostLoginLoading(true);
                 setVerified(true);
                 setTimeout(() => {
-                  toast.success("✅ Logged in successfully!");
-                  setTimeout(() => setPostLoginLoading(false), 1000); // Show main content after toast
+                  setPostLoginLoading(false); // Show main content after animation
                 }, 2000); // Show animation for 2 seconds
 
                 // Set localStorage for driver
