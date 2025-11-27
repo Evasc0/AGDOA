@@ -127,7 +127,7 @@ const Admin = () => {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<
     "drivers" | "logs" | "queue" | "status" | "history" | "pending" | "analytics"
-  >("drivers");
+  >("analytics");
 
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -672,13 +672,13 @@ const Admin = () => {
           </div>
           <nav className="space-y-2 flex-1 overflow-hidden">
             {[
+              { type: "analytics", label: "Analytics", icon: BarChart3 },
               { type: "drivers", label: "Drivers", icon: Users },
               { type: "queue", label: "Queue", icon: ListOrdered },
               { type: "status", label: "Status", icon: Activity },
               { type: "logs", label: "Logs", icon: FileText },
               { type: "history", label: "History", icon: History },
               { type: "pending", label: "Pending", icon: AlertCircle },
-              { type: "analytics", label: "Analytics", icon: BarChart3 },
             ].map(({ type, label, icon: Icon }) => (
               <button
                 key={type}
