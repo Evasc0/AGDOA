@@ -52,21 +52,7 @@ import { fareMatrix } from '../utils/fareMatrix';
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-// Driver colors for pie chart and boxes
-const driverColors = Array.from({length: 50}, (_, i) => `hsl(${i * 7.2}, 70%, 50%)`);
-const driverBgClasses = [
-  'bg-red-500', 'bg-red-600', 'bg-red-700', 'bg-red-800', 'bg-red-900',
-  'bg-blue-500', 'bg-blue-600', 'bg-blue-700', 'bg-blue-800', 'bg-blue-900',
-  'bg-green-500', 'bg-green-600', 'bg-green-700', 'bg-green-800', 'bg-green-900',
-  'bg-yellow-500', 'bg-yellow-600', 'bg-yellow-700', 'bg-yellow-800', 'bg-yellow-900',
-  'bg-purple-500', 'bg-purple-600', 'bg-purple-700', 'bg-purple-800', 'bg-purple-900',
-  'bg-pink-500', 'bg-pink-600', 'bg-pink-700', 'bg-pink-800', 'bg-pink-900',
-  'bg-indigo-500', 'bg-indigo-600', 'bg-indigo-700', 'bg-indigo-800', 'bg-indigo-900',
-  'bg-teal-500', 'bg-teal-600', 'bg-teal-700', 'bg-teal-800', 'bg-teal-900',
-  'bg-orange-500', 'bg-orange-600', 'bg-orange-700', 'bg-orange-800', 'bg-orange-900',
-  'bg-cyan-500', 'bg-cyan-600', 'bg-cyan-700', 'bg-cyan-800', 'bg-cyan-900',
-  'bg-gray-500', 'bg-gray-600', 'bg-gray-700', 'bg-gray-800', 'bg-gray-900'
-];
+
 
 interface Driver {
   id: string;
@@ -647,11 +633,11 @@ const Admin = () => {
   };
 
   return (
-    <div className="p-4 max-w-6xl mx-auto text-white bg-gray-900">
+    <div className="p-4 max-w-6xl mx-auto text-gray-900 bg-gray-100">
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold">Admin Panel</h1>
-          <span className="text-lg text-gray-300">{new Date().toLocaleDateString('en-US', { month: 'long' }) + ': ' + new Date().getDate() + ', ' + new Date().getFullYear()}</span>
+          <span className="text-lg text-gray-600">{new Date().toLocaleDateString('en-US', { month: 'long' }) + ': ' + new Date().getDate() + ', ' + new Date().getFullYear()}</span>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           {["drivers", "queue", "status", "logs", "history", "pending", "analytics"].map((type) => (
@@ -659,7 +645,7 @@ const Admin = () => {
               key={type}
               onClick={() => setTab(type as any)}
               className={`relative px-3 py-2 rounded ${
-                tab === type ? "bg-blue-600" : "bg-gray-700"
+                tab === type ? "bg-blue-600" : "bg-gray-200"
               }`}
             >
               {type[0].toUpperCase() + type.slice(1)}
@@ -691,9 +677,9 @@ const Admin = () => {
           />
 
           <div className="overflow-x-auto">
-<table className="w-full text-sm bg-gray-800 rounded overflow-hidden">
+<table className="w-full text-sm bg-white rounded overflow-hidden">
               <thead>
-<tr className="bg-gray-700 text-left">
+<tr className="bg-gray-50 text-left">
                   <th className="p-2">Name</th>
                   <th>Plate</th>
                   <th>Status</th>
@@ -703,7 +689,7 @@ const Admin = () => {
               </thead>
               <tbody>
                 {filteredDrivers.map((driver) => (
-                  <tr key={driver.id} className="border-t border-gray-600">
+                  <tr key={driver.id} className="border-t border-gray-300">
                     <td className="p-2">{driver.name}</td>
                     <td>{driver.plate}</td>
                     <td>{getDriverStatus(driver.id)}</td>
@@ -760,8 +746,8 @@ const Admin = () => {
 
       {/* QUEUE */}
       {tab === "queue" && (
-        <div className="bg-gray-800 p-4 rounded mt-4 border border-gray-700">
-          <h2 className="text-lg font-bold mb-2">Driver Queue</h2>
+        <div className="bg-white p-4 rounded mt-4 border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-2 text-gray-900">Driver Queue</h2>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -779,7 +765,7 @@ const Admin = () => {
                   return (
                     <li
                       key={entry.driverId}
-                      className="flex justify-between items-center bg-gray-700 p-2 rounded cursor-move"
+                      className="flex justify-between items-center bg-gray-50 p-2 rounded cursor-move border border-gray-200"
                     >
                       <span>
                         {driver?.name ?? entry.name} ({driver?.plate ?? entry.plate})
@@ -788,10 +774,10 @@ const Admin = () => {
                         <span
                           className={`text-sm font-medium ${
                             status === "In Queue"
-                              ? "text-green-400"
+                              ? "text-green-600"
                               : status === "Left the queue (In Ride)"
-                              ? "text-yellow-400"
-                              : "text-red-400"
+                              ? "text-yellow-600"
+                              : "text-red-600"
                           }`}
                         >
                           {status}
@@ -802,7 +788,7 @@ const Admin = () => {
                               removeFromQueue(entry.driverId);
                             }
                           }}
-                          className="text-red-400"
+                          className="text-red-600"
                         >
                           Remove
                         </button>
@@ -818,12 +804,12 @@ const Admin = () => {
 
       {/* STATUS */}
       {tab === "status" && (
-        <div className="mt-4 bg-gray-800 p-4 rounded">
-          <h2 className="text-lg font-bold mb-4">Driver Status</h2>
+        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-4 text-gray-900">Driver Status</h2>
 
           {/* In Queue */}
           <div className="mb-6">
-            <h3 className="text-md font-semibold mb-2 text-green-400">In Queue</h3>
+            <h3 className="text-md font-semibold mb-2 text-green-600">In Queue</h3>
             <ul className="space-y-2">
               {drivers
                 .filter((driver) => driver.status === "waiting")
@@ -835,11 +821,11 @@ const Admin = () => {
                 .map((driver) => (
                   <li
                     key={driver.id}
-                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                    className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200"
                   >
                     <span>
                       {driver.name} ({driver.plate}) -{" "}
-                      <span className="font-semibold text-green-400">In Queue</span>
+                      <span className="font-semibold text-green-600">In Queue</span>
                     </span>
                   </li>
                 ))}
@@ -848,7 +834,7 @@ const Admin = () => {
 
           {/* In Ride */}
           <div className="mb-6">
-            <h3 className="text-md font-semibold mb-2 text-yellow-400">In Ride</h3>
+            <h3 className="text-md font-semibold mb-2 text-yellow-600">In Ride</h3>
             <ul className="space-y-2">
               {drivers
                 .filter((driver) => driver.status === "in ride")
@@ -863,15 +849,15 @@ const Admin = () => {
                   return (
                     <li
                       key={driver.id}
-                      className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                      className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200"
                     >
                       <span>
                         {driver.name} ({driver.plate}) -{" "}
-                        <span className="font-semibold text-yellow-400">
+                        <span className="font-semibold text-yellow-600">
                           In route to {destination}
                         </span>
                       </span>
-<span className="text-sm text-gray-400">{leftTime}</span>
+<span className="text-sm text-gray-500">{leftTime}</span>
                     </li>
                   );
                 })}
@@ -880,7 +866,7 @@ const Admin = () => {
 
           {/* Offline */}
           <div>
-            <h3 className="text-md font-semibold mb-2 text-red-400">Offline</h3>
+            <h3 className="text-md font-semibold mb-2 text-red-600">Offline</h3>
             <ul className="space-y-2">
               {drivers
                 .filter((driver) => driver.status === "offline")
@@ -888,11 +874,11 @@ const Admin = () => {
                 .map((driver) => (
                   <li
                     key={driver.id}
-                    className="flex justify-between items-center bg-gray-700 p-2 rounded"
+                    className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200"
                   >
                     <span>
                       {driver.name} ({driver.plate}) -{" "}
-                      <span className="font-semibold text-red-400">Offline</span>
+                      <span className="font-semibold text-red-600">Offline</span>
                     </span>
                   </li>
                 ))}
@@ -903,19 +889,19 @@ const Admin = () => {
 
       {/* LOGS */}
       {tab === "logs" && (
-        <div className="mt-4 bg-gray-800 p-4 rounded">
-          <h2 className="text-lg font-bold mb-2">Admin Activity Logs</h2>
+        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-2 text-gray-900">Admin Activity Logs</h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm bg-gray-800 rounded overflow-hidden">
+            <table className="w-full text-sm bg-white rounded overflow-hidden">
               <thead>
-                <tr className="bg-gray-700 text-left">
+                <tr className="bg-gray-50 text-left">
                   <th className="p-2">Actions</th>
                   <th className="p-2">Date and Time</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-t border-gray-600">
+                  <tr key={log.id} className="border-t border-gray-300">
                     <td className="p-2"><strong>{log.email}</strong>: {log.action}</td>
                     <td className="p-2">{log.timestamp?.seconds ? formatTime(log.timestamp.seconds) : "No time"}</td>
                   </tr>
@@ -928,19 +914,19 @@ const Admin = () => {
 
       {/* DRIVER HISTORY */}
       {tab === "history" && (
-        <div className="mt-4 bg-gray-800 p-4 rounded">
-          <h2 className="text-lg font-bold mb-2">Driver History</h2>
+        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-2 text-gray-900">Driver History</h2>
           <button
             onClick={fetchDestinationHistory}
             disabled={loadingDestinationHistory}
-            className="mb-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {loadingDestinationHistory ? "Loading..." : "View Destination History"}
           </button>
           <div className="overflow-y-auto max-h-[400px] space-y-2">
             {drivers.map((driver) => (
-<div key={driver.id} className="border-b border-gray-600 py-1">
-                <p className="text-sm">
+<div key={driver.id} className="border-b border-gray-300 py-1">
+                <p className="text-sm text-gray-900">
                   <strong>{driver.name}</strong> — {driver.plate} — Registered on:{" "}
                   {formatTime(driver.createdAt?.seconds)}
                 </p>
@@ -949,14 +935,14 @@ const Admin = () => {
           </div>
           {showDestinationHistory && (
             <div className="mt-4">
-              <h3 className="text-md font-semibold mb-2">Destination History (Chronological)</h3>
+              <h3 className="text-md font-semibold mb-2 text-gray-900">Destination History (Chronological)</h3>
               {destinationHistory.length === 0 ? (
-<p className="text-gray-400">No rides found.</p>
+<p className="text-gray-500">No rides found.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm bg-gray-700 rounded overflow-hidden">
+                  <table className="w-full text-sm bg-white rounded overflow-hidden border border-gray-300">
                     <thead>
-                      <tr className="bg-gray-600 text-left">
+                      <tr className="bg-gray-50 text-left">
                         <th className="p-2">Driver Name</th>
                         <th>Plate Number</th>
                         <th>Destination</th>
@@ -968,11 +954,11 @@ const Admin = () => {
                         const driver = drivers.find(d => d.id === ride.driverId);
                         const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
                         return (
-<tr key={ride.id} className="border-t border-gray-600">
-                            <td className="p-2">{driver?.name || "Unknown Driver"}</td>
-                            <td>{driver?.plate || "N/A"}</td>
-                            <td>{ride.dropoffName}</td>
-                            <td>{startedAt.toLocaleString()}</td>
+<tr key={ride.id} className="border-t border-gray-300">
+                            <td className="p-2 text-gray-900">{driver?.name || "Unknown Driver"}</td>
+                            <td className="text-gray-900">{driver?.plate || "N/A"}</td>
+                            <td className="text-gray-900">{ride.dropoffName}</td>
+                            <td className="text-gray-900">{startedAt.toLocaleString()}</td>
                           </tr>
                         );
                       })}
@@ -987,14 +973,14 @@ const Admin = () => {
 
       {/* PENDING REGISTRATION REQUESTS */}
       {tab === "pending" && (
-        <div className="bg-gray-800 p-4 rounded mt-4">
-          <h2 className="text-lg font-bold mb-2">Pending Registration Requests</h2>
+        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-2 text-gray-900">Pending Registration Requests</h2>
           {pendingDrivers.length === 0 ? (
-            <p>No pending requests.</p>
+            <p className="text-gray-500">No pending requests.</p>
           ) : (
-            <table className="w-full text-sm bg-gray-700 rounded overflow-hidden">
+            <table className="w-full text-sm bg-white rounded overflow-hidden border border-gray-300">
               <thead>
-                <tr className="bg-gray-600 text-left">
+                <tr className="bg-gray-50 text-left">
                   <th className="p-2">Name</th>
                   <th>Plate</th>
                   <th>Email</th>
@@ -1005,12 +991,12 @@ const Admin = () => {
               </thead>
               <tbody>
                 {pendingDrivers.map((driver) => (
-                  <tr key={driver.id} className="border-t border-gray-600">
-                    <td className="p-2">{driver.name}</td>
-                    <td>{driver.plate}</td>
-                    <td>{driver.email}</td>
-                    <td>{driver.phone || "N/A"}</td>
-                    <td>Pending</td>
+                  <tr key={driver.id} className="border-t border-gray-300">
+                    <td className="p-2 text-gray-900">{driver.name}</td>
+                    <td className="text-gray-900">{driver.plate}</td>
+                    <td className="text-gray-900">{driver.email}</td>
+                    <td className="text-gray-900">{driver.phone || "N/A"}</td>
+                    <td className="text-gray-900">Pending</td>
                     <td className="space-x-2 text-right pr-4">
                       <button
                         onClick={async () => {
@@ -1031,7 +1017,7 @@ const Admin = () => {
                             toast.error("Failed to verify: " + error.message);
                           }
                         }}
-                        className="text-green-400"
+                        className="text-green-600"
                       >
                         Approve
                       </button>
@@ -1050,7 +1036,7 @@ const Admin = () => {
                             toast.error("Failed to delete: " + error.message);
                           }
                         }}
-                        className="text-red-400"
+                        className="text-red-600"
                       >
                         Reject
                       </button>
@@ -1065,8 +1051,8 @@ const Admin = () => {
 
       {/* ANALYTICS */}
       {tab === "analytics" && (
-        <div className="mt-4 bg-gray-800 p-4 rounded">
-          <h2 className="text-lg font-bold mb-4">Analytics Dashboard</h2>
+        <div className="mt-4 bg-white p-4 rounded border border-gray-300 shadow-sm">
+          <h2 className="text-lg font-bold mb-4 text-gray-900">Analytics Dashboard</h2>
 
           {/* Filter Buttons */}
           <div className="flex gap-2 mb-6">
@@ -1075,7 +1061,7 @@ const Admin = () => {
                 key={filter}
                 onClick={() => setAnalyticsFilter(filter as any)}
 className={`px-4 py-2 rounded ${
-                  analyticsFilter === filter ? "bg-blue-600" : "bg-gray-700"
+                  analyticsFilter === filter ? "bg-blue-600" : "bg-gray-200"
                 }`}
               >
                 {filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -1084,7 +1070,7 @@ className={`px-4 py-2 rounded ${
             <button
               onClick={() => setShowAnalyticsFilterModal(true)}
 className={`px-4 py-2 rounded ${
-                analyticsFilter === 'custom' ? "bg-blue-600" : "bg-gray-700"
+                analyticsFilter === 'custom' ? "bg-blue-600" : "bg-gray-200"
               }`}
             >
               Custom
@@ -1093,8 +1079,8 @@ className={`px-4 py-2 rounded ${
 
           {/* Overall Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-gray-700 p-4 rounded">
-              <h3 className="text-md font-semibold mb-2">Overall Statistics</h3>
+            <div className="bg-white p-4 rounded border border-gray-300">
+              <h3 className="text-md font-semibold mb-2 text-gray-900">Overall Statistics</h3>
               {allPieStats.length > 0 && (
                 <Pie
                   data={{
@@ -1123,14 +1109,14 @@ className={`px-4 py-2 rounded ${
               )}
               {/* Total Summary */}
               <div className="mt-4 text-sm font-bold">
-                <p><span className="text-gray-300">Total Rides:</span> {totalRides}</p>
-                <p><span className="text-gray-300">Total Earnings:</span> ₱{totalEarnings}</p>
+                <p><span className="text-gray-900">Total Rides:</span> {totalRides}</p>
+                <p><span className="text-gray-900">Total Earnings:</span> ₱{totalEarnings}</p>
               </div>
             </div>
 
             {/* Per-Driver Stats */}
-            <div className="bg-gray-700 p-4 rounded">
-              <h3 className="text-md font-semibold mb-2">Driver Performance</h3>
+            <div className="bg-white p-4 rounded border border-gray-300">
+              <h3 className="text-md font-semibold mb-2 text-gray-900">Driver Performance</h3>
               <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {[...drivers].sort((a, b) => {
                   const aEarnings = driverPieStats[a.id]?.[1]?.earnings || 0;
@@ -1162,14 +1148,14 @@ className={`px-4 py-2 rounded ${
                   );
                 })}
                 {/* Total Summary */}
-<div className="bg-gray-600 p-3 rounded font-bold border-t border-gray-500">
-                  <h4 className="mb-2">Total for All Drivers</h4>
+<div className="bg-gray-50 p-3 rounded font-bold border-t border-gray-300">
+                  <h4 className="mb-2 text-gray-900">Total for All Drivers</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-gray-300">Total Rides:</span> {totalRides}
+                      <span className="text-gray-900">Total Rides:</span> {totalRides}
                     </div>
                     <div>
-                      <span className="text-gray-300">Total Earnings:</span> ₱{totalEarnings}
+                      <span className="text-gray-900">Total Earnings:</span> ₱{totalEarnings}
                     </div>
                   </div>
                 </div>

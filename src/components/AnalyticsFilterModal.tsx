@@ -26,13 +26,13 @@ const AnalyticsFilterModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-gray-900 text-white p-6 rounded-xl w-full max-w-md shadow-lg">
+      <div className="bg-white text-gray-900 p-6 rounded-xl w-full max-w-md shadow-lg border border-gray-300">
         <h2 className="text-xl font-bold mb-4">Filter Analytics</h2>
 
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-2">
             <button
-              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
                 const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -45,7 +45,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               Today
             </button>
             <button
-              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
                 const sevenDaysAgo = new Date(now);
@@ -59,7 +59,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               Last 7 Days
             </button>
             <button
-              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
                 const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -72,7 +72,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               This Month
             </button>
             <button
-              className="text-xs bg-gray-700 px-2 py-1 rounded hover:bg-gray-600"
+              className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 setStartDate(null);
                 setEndDate(null);
@@ -85,10 +85,10 @@ const AnalyticsFilterModal: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-sm mb-1">Start Date</label>
+            <label className="block text-sm mb-1 text-gray-900">Start Date</label>
             <input
               type="date"
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={startDate ? startDate.toISOString().split('T')[0] : ''}
               onChange={(e) =>
                 setStartDate(e.target.value ? new Date(e.target.value) : null)
@@ -97,10 +97,10 @@ const AnalyticsFilterModal: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-sm mb-1">End Date</label>
+            <label className="block text-sm mb-1 text-gray-900">End Date</label>
             <input
               type="date"
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={endDate ? endDate.toISOString().split('T')[0] : ''}
               onChange={(e) =>
                 setEndDate(e.target.value ? new Date(e.target.value) : null)
@@ -109,9 +109,9 @@ const AnalyticsFilterModal: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-sm mb-1">Month</label>
+            <label className="block text-sm mb-1 text-gray-900">Month</label>
             <select
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={selectedMonth ?? ''}
               onChange={(e) =>
                 setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)
@@ -127,9 +127,9 @@ const AnalyticsFilterModal: React.FC<Props> = ({
           </div>
 
           <div>
-            <label className="block text-sm mb-1">Year</label>
+            <label className="block text-sm mb-1 text-gray-900">Year</label>
             <select
-              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700"
+              className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={selectedYear ?? ''}
               onChange={(e) =>
                 setSelectedYear(e.target.value ? parseInt(e.target.value) : null)
@@ -154,14 +154,14 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               setSelectedYear(null);
               if (onClear) onClear();
             }}
-            className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded"
+            className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-4 py-2 rounded"
           >
             Clear
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded"
+              className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-4 py-2 rounded"
             >
               Cancel
             </button>

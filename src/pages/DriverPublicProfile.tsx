@@ -56,7 +56,7 @@ const DriverProfilePublic = () => {
 
   if (!driver) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-900 text-white p-4">
+      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 text-gray-900 p-4">
         <p className="mb-4">Driver profile not found.</p>
         <Link to="/" className="text-blue-500 hover:underline">
           Return to Home
@@ -68,11 +68,11 @@ const DriverProfilePublic = () => {
   const profileUrl = `${window.location.origin}/driver/${driverId}`;
 
   return (
-    <div className="flex justify-center p-4 bg-gray-900 min-h-screen text-white">
-      <div className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md">
+    <div className="flex justify-center p-4 bg-gray-100 min-h-screen text-gray-900">
+      <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md">
         {/* Profile Image */}
         <div className="flex justify-center mb-6">
-          <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-700 border-2 border-white">
+          <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-200 border-2 border-gray-900">
             {driver.image ? (
               <img
                 src={driver.image}

@@ -58,8 +58,8 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-900 text-white p-4 relative">
-      <div className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gray-100 text-gray-900 p-4 relative">
+      <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Welcome, {driver?.name ?? "Driver"}</h2>
@@ -80,7 +80,7 @@ const Home = () => {
           )}
         </div>
 
-        <hr className="border-gray-700 mb-4" />
+        <hr className="border-gray-300 mb-4" />
 
         {/* Live Ride Status */}
         <div className="mb-4">
@@ -100,7 +100,7 @@ const Home = () => {
 
         {/* Location Status */}
         <div className="mb-4">
-          <p className="text-sm text-gray-400 mb-1">
+          <p className="text-sm text-gray-600 mb-1">
             📍 <span className="font-semibold">Location Status:</span>
           </p>
           <p
@@ -117,7 +117,7 @@ const Home = () => {
         </div>
 
         {/* Vehicle Info */}
-        <div className="bg-gray-700 p-3 rounded-lg mb-4">
+        <div className="bg-gray-200 p-3 rounded-lg mb-4">
           <p className="text-sm font-semibold mb-1">Vehicle Information</p>
           <p>
             <strong>Plate Number:</strong> {driver?.plate}
@@ -131,7 +131,7 @@ const Home = () => {
         <div className="mb-4">
           <p className="text-sm font-bold mb-1">📍 Destination:</p>
           <select
-            className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500 focus:outline-none"
+            className="w-full p-2 rounded bg-gray-100 text-gray-900 border border-gray-300 focus:border-blue-500 focus:outline-none"
             value={selectedDestination || ""}
             onChange={(e) => setSelectedDestination(e.target.value)}
           >
@@ -146,17 +146,17 @@ const Home = () => {
 
         {/* Queue Info - ONLY show if in queue and NOT in ride */}
         {hasJoined && !rideStarted && (
-          <div className="bg-gray-700 p-4 rounded-lg mb-4">
+          <div className="bg-gray-200 p-4 rounded-lg mb-4">
             <p className="text-sm font-bold mb-2">🚕 Queue Status</p>
             <p className="text-sm mb-2">
               Your position:{" "}
-              <span className="font-semibold text-yellow-300">
+              <span className="font-semibold text-yellow-600">
                 {position ?? "N/A"}
               </span>
             </p>
             <p className="text-sm mb-2">
               ⏳ Estimated Wait:{" "}
-              <span className="font-semibold text-blue-300">{countdown}</span>
+              <span className="font-semibold text-blue-600">{countdown}</span>
             </p>
 
             {position === 1 && (
@@ -166,7 +166,7 @@ const Home = () => {
             )}
 
             <div className="mt-2">
-              <p className="text-sm font-semibold mb-1 text-gray-300">
+              <p className="text-sm font-semibold mb-1 text-gray-700">
                 Current Queue:
               </p>
               <div className="space-y-1">
@@ -180,8 +180,8 @@ const Home = () => {
                       transition={{ duration: 0.2 }}
                       className={`text-sm px-3 py-1 rounded ${
                         item.driverId === driver?.id
-                          ? "bg-yellow-700 text-white"
-                          : "bg-gray-600 text-gray-100"
+                          ? "bg-yellow-200 text-gray-900"
+                          : "bg-gray-300 text-gray-900"
                       }`}
                     >
                       {index + 1}. {item.plateNumber}

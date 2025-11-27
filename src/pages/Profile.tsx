@@ -122,12 +122,12 @@ const Profile = () => {
   const profileUrl = `${window.location.origin}/driver/${user?.uid}`;
 
   return (
-    <div className="flex justify-center p-4 bg-gray-900 min-h-screen text-white">
+    <div className="flex justify-center p-4 bg-gray-100 min-h-screen text-gray-900">
       <AnimatePresence>
         {!isLoggingOut && (
           <motion.div
             key="profileCard"
-            className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md"
+            className="w-full max-w-md bg-white p-6 rounded-xl shadow-md"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
@@ -136,7 +136,7 @@ const Profile = () => {
             {/* Profile Image Section */}
             <div className="flex flex-col items-center mb-4 relative">
               <div
-                className="w-24 h-24 rounded-full overflow-hidden bg-gray-700 mb-2 cursor-pointer border-2 border-white hover:scale-105 transition-transform"
+                className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 mb-2 cursor-pointer border-2 border-gray-900 hover:scale-105 transition-transform"
                 onClick={() => image && setZoomedImage(true)}
               >
                 {image ? (
@@ -190,7 +190,7 @@ const Profile = () => {
                   <input
                     value={age}
                     onChange={(e) => setAge(e.target.value)}
-                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                    className="bg-gray-200 rounded p-1 ml-2 w-full"
                   />
                 ) : (
                   age
@@ -203,7 +203,7 @@ const Profile = () => {
                   <input
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
-                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                    className="bg-gray-200 rounded p-1 ml-2 w-full"
                   />
                 ) : (
                   contact
@@ -216,7 +216,7 @@ const Profile = () => {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                    className="bg-gray-200 rounded p-1 ml-2 w-full"
                   >
                     <option value="GCash">GCash</option>
                     <option value="PayMaya">PayMaya</option>
@@ -232,7 +232,7 @@ const Profile = () => {
                   <input
                     value={paymentNumber}
                     onChange={(e) => setPaymentNumber(e.target.value)}
-                    className="bg-gray-700 rounded p-1 ml-2 w-full"
+                    className="bg-gray-200 rounded p-1 ml-2 w-full"
                   />
                 ) : (
                   paymentNumber || "N/A"

@@ -27,7 +27,7 @@ interface Props {
 
 const RideHistoryCard: React.FC<Props> = ({ log }) => {
   return (
-    <div className="bg-gray-700 p-4 rounded-lg mb-4 shadow-md">
+    <div className="bg-white p-4 rounded-lg mb-4 shadow-md">
       {/* Destination name */}
       <p className="text-lg font-semibold mb-1">{log.dropoffName}</p>
 

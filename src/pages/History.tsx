@@ -137,7 +137,7 @@ export default function History() {
   };
 
   return (
-    <div className="p-4 max-w-2xl mx-auto min-h-screen bg-gray-900 text-white">
+    <div className="p-4 max-w-2xl mx-auto min-h-screen bg-gray-100 text-gray-900">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">Ride History</h2>
         <Button onClick={() => setIsFilterOpen(true)} className="gap-2">

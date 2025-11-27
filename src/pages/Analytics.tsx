@@ -351,15 +351,15 @@ const Analytics: React.FC = () => {
   }, [filter, fetchPie, user]);
 
   return (
-    <div className="p-4 text-white max-w-4xl mx-auto">
+    <div className="p-4 text-gray-900 max-w-4xl mx-auto">
       <h1 className="text-2xl font-semibold mb-6">📊 Analytics Dashboard</h1>
 
-      {alertMsg && <div className="bg-yellow-600 p-3 rounded-lg mb-6">{alertMsg}</div>}
+      {alertMsg && <div className="bg-yellow-200 p-3 rounded-lg mb-6">{alertMsg}</div>}
 
       {forecast.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 mb-8">
           {forecast.map((day, i) => (
-            <div key={i} className="bg-blue-900 p-3 rounded-xl flex flex-col items-center shadow">
+            <div key={i} className="bg-blue-100 p-3 rounded-xl flex flex-col items-center shadow">
               <p className="text-sm font-medium">{day.date}</p>
               <div className="text-3xl my-2">{day.icon}</div>
               <p className="font-bold">{day.temp.toFixed(1)}°C</p>
@@ -370,25 +370,25 @@ const Analytics: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8 ">
-        <div className="bg-gray-800 p-5 rounded-lg text-center">
+        <div className="bg-gray-200 p-5 rounded-lg text-center">
           <div className=" text-3xl">🕒</div>
           <p className="mt-2 font-semibold text-lg">Avg Wait Time</p>
           <p className="text-xl">{avgWaitTime} mins</p>
           <p className="text-xs italic mt-1">(Based on queued wait times recorded)</p>
         </div>
-        <div className="bg-gray-800 p-5 rounded-lg text-center">
+        <div className="bg-gray-200 p-5 rounded-lg text-center">
           <div className="text-3xl">🚖</div>
           <p className="mt-2 font-semibold text-lg">Rides Today</p>
           <p className="text-xl">{ridesToday} <br />as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
         </div>
-        <div className="bg-gray-800 p-5 rounded-lg text-center">
+        <div className="bg-gray-200 p-5 rounded-lg text-center">
           <div className="text-3xl">🤑</div>
           <p className="mt-2 font-semibold text-lg">Total Earnings</p>
           <p className="text-xl">₱{earnings.toFixed(2)} <br />as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
         </div>
       </div>
 
-      <div className="bg-gray-800 p-4 rounded-lg mb-8">
+      <div className="bg-gray-200 p-4 rounded-lg mb-8">
         <h2 className="font-semibold mb-2">🏁 Top Drop-offs</h2>
         {Object.entries(dropoffAreas).length ? (
           <ul className="list-disc list-inside text-sm max-h-48 overflow-auto">
@@ -402,7 +402,7 @@ const Analytics: React.FC = () => {
               ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-400">No drop-offs recorded yet.</p>
+          <p className="text-sm text-gray-600">No drop-offs recorded yet.</p>
         )}
       </div>
 
@@ -420,7 +420,7 @@ const Analytics: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-gray-900 p-6 rounded-xl shadow-lg">
+      <div className="bg-gray-100 p-6 rounded-xl shadow-lg">
         <h2 className="text-lg font-semibold mb-4">📈 7-Day Ride & Earnings Trend</h2>
         <div className="overflow-x-auto">
           <div className="min-w-[320px] sm:min-w-full">
@@ -451,12 +451,12 @@ const Analytics: React.FC = () => {
                 scales: {
                   y: {
                     beginAtZero: true,
-                    ticks: { color: '#fff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: '#000' },
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                   x: {
-                    ticks: { color: '#fff' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: '#000' },
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                 },
                 plugins: {
@@ -470,7 +470,7 @@ const Analytics: React.FC = () => {
                   },
                   legend: {
                     labels: {
-                      color: '#fff',
+                      color: '#000',
                     },
                   },
                 },
@@ -480,7 +480,7 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-gray-900 p-6 rounded-xl shadow-lg mt-8">
+      <div className="bg-gray-100 p-6 rounded-xl shadow-lg mt-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">📊 Ride & Earnings Breakdown</h2>
           <div className="flex space-x-2">
@@ -489,7 +489,7 @@ const Analytics: React.FC = () => {
                 setIsFilterModalOpen(true);
               }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               Filter
@@ -501,7 +501,7 @@ const Analytics: React.FC = () => {
                 fetchPie('weekly');
               }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'weekly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                filter === 'weekly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               Weekly
@@ -513,7 +513,7 @@ const Analytics: React.FC = () => {
                 fetchPie('monthly');
               }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'monthly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                filter === 'monthly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               Monthly
@@ -525,7 +525,7 @@ const Analytics: React.FC = () => {
                 fetchPie('annually');
               }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'annually' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                filter === 'annually' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               Annually
@@ -553,7 +553,7 @@ const Analytics: React.FC = () => {
                       }
                     })(),
                     borderWidth: 2,
-                    borderColor: '#1f2937',
+                    borderColor: '#e5e7eb',
                   },
                 ]
               }}
@@ -575,7 +575,7 @@ const Analytics: React.FC = () => {
                   },
                   legend: {
                     labels: {
-                      color: '#fff',
+                      color: '#000',
                     },
                   },
                 },
@@ -589,7 +589,7 @@ const Analytics: React.FC = () => {
         <AnalyticsFilterModal
           isOpen={isFilterModalOpen}
           onClose={() => setIsFilterModalOpen(false)}
-          onApply={(start, end) => {
+          onApply={(start: Date | null, end: Date | null) => {
             setStartDate(start);
             setEndDate(end);
             setCustomFilter(true);
