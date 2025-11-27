@@ -48,6 +48,7 @@ import {
 } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
 import { fareMatrix } from '../utils/fareMatrix';
+import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut } from 'lucide-react';
 
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -147,6 +148,29 @@ const Admin = () => {
   const [loadingDestinationHistory, setLoadingDestinationHistory] = useState(false);
   const [activeRides, setActiveRides] = useState<any[]>([]);
   const [pieColors, setPieColors] = useState<string[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768); // Open by default on md+ screens
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Update isMobile on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobile, sidebarOpen]);
 
   // Keep track of driverId timers to set offline after 1 min if they don't return to queue
   const offlineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -633,37 +657,71 @@ const Admin = () => {
   };
 
   return (
-    <div className="p-4 max-w-6xl mx-auto text-gray-900 bg-gray-100">
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold">Admin Panel</h1>
-          <span className="text-lg text-gray-600">{new Date().toLocaleDateString('en-US', { month: 'long' }) + ': ' + new Date().getDate() + ', ' + new Date().getFullYear()}</span>
-        </div>
-        <div className="flex gap-2 items-center flex-wrap">
-          {["drivers", "queue", "status", "logs", "history", "pending", "analytics"].map((type) => (
+    <div className="min-h-screen bg-gray-100">
+      {/* Sidebar */}
+      <div className={`fixed top-0 left-0 h-full bg-gray-100 text-gray-900 transition-all duration-300 overflow-hidden overscroll-none z-10 ${sidebarOpen ? 'w-full md:w-64' : 'w-0'}`}>
+        <div className="p-4 h-full flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Admin Panel</h2>
             <button
-              key={type}
-              onClick={() => setTab(type as any)}
-              className={`relative px-3 py-2 rounded ${
-                tab === type ? "bg-blue-600" : "bg-gray-200"
-              }`}
+              onClick={() => setSidebarOpen(false)}
+              className="p-1 hover:bg-gray-200 rounded"
             >
-              {type[0].toUpperCase() + type.slice(1)}
-              {type === "pending" && pendingDrivers.length > 0 && (
-                <span className="absolute top-0 right-0 -mt-1 -mr-2 bg-red-600 text-xs rounded-full px-1.5">
-                  {pendingDrivers.length}
-                </span>
-              )}
+              ✕
             </button>
-          ))}
-          <button
-            onClick={handleLogout}
-            className="px-3 py-2 rounded bg-red-600 whitespace-nowrap"
-          >
-            Logout
-          </button>
+          </div>
+          <nav className="space-y-2 flex-1 overflow-hidden">
+            {[
+              { type: "drivers", label: "Drivers", icon: Users },
+              { type: "queue", label: "Queue", icon: ListOrdered },
+              { type: "status", label: "Status", icon: Activity },
+              { type: "logs", label: "Logs", icon: FileText },
+              { type: "history", label: "History", icon: History },
+              { type: "pending", label: "Pending", icon: AlertCircle },
+              { type: "analytics", label: "Analytics", icon: BarChart3 },
+            ].map(({ type, label, icon: Icon }) => (
+              <button
+                key={type}
+                onClick={() => setTab(type as any)}
+                className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${
+                  tab === type ? "bg-blue-600 text-white" : "hover:bg-gray-200"
+                }`}
+              >
+                <Icon size={18} />
+                {label}
+                {type === "pending" && pendingDrivers.length > 0 && (
+                  <span className="ml-auto bg-red-600 text-xs rounded-full px-1.5">
+                    {pendingDrivers.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="mt-auto">
+            <button
+              onClick={handleLogout}
+              className="w-full px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className={`p-4 text-gray-900 ${sidebarOpen ? 'md:ml-64' : ''} ${isMobile && sidebarOpen ? 'overflow-hidden' : ''}`}>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 bg-gray-200 rounded hover:bg-gray-300"
+            >
+              ☰
+            </button>
+          </div>
+          <span className="text-lg text-gray-600">{new Date().toLocaleDateString('en-US', { month: 'long' }) + ': ' + new Date().getDate() + ', ' + new Date().getFullYear()}</span>
+        </div>
 
       {/* DRIVERS LIST */}
       {tab === "drivers" && (
@@ -1183,7 +1241,8 @@ className={`px-4 py-2 rounded ${
         />
       )}
     </div>
-  );
+  </div>
+);
 };
 
 export default Admin;
