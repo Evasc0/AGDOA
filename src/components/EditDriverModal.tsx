@@ -93,14 +93,14 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess, user }: EditDriverMod
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
       <div
         className={classNames(
-          "bg-gray-900 p-6 rounded-lg max-w-md w-full transform transition-all duration-300",
+          "bg-white p-6 rounded-lg max-w-md w-full transform transition-all duration-300 border border-gray-300 shadow-lg",
           {
             "scale-100 opacity-100": visible,
             "scale-95 opacity-0": !visible,
           }
         )}
       >
-        <h2 className="text-lg font-bold text-white mb-4">Edit Driver</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Edit Driver</h2>
 
         <div className="space-y-3">
           <input
@@ -108,40 +108,40 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess, user }: EditDriverMod
             placeholder="Name"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           />
           <input
             type="text"
             placeholder="Plate"
             value={form.plate}
             onChange={(e) => setForm({ ...form, plate: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           />
           <input
             type="text"
             placeholder="Contact"
             value={form.contact}
             onChange={(e) => setForm({ ...form, contact: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           />
           <input
             type="number"
             placeholder="Age"
             value={form.age}
             onChange={(e) => setForm({ ...form, age: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           />
           <input
             type="text"
             placeholder="Payment Number"
             value={form.paymentNumber}
             onChange={(e) => setForm({ ...form, paymentNumber: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           />
           <select
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="w-full p-2 rounded text-black"
+            className="w-full p-2 rounded bg-gray-50 border border-gray-300 text-gray-900"
           >
             <option value="offline">Offline</option>
             <option value="online">Online</option>
@@ -151,7 +151,7 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess, user }: EditDriverMod
         <div className="flex justify-end mt-6 space-x-3">
           <button
             onClick={handleClose}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+            className="bg-gray-200 hover:bg-gray-300 text-gray-900 px-4 py-2 rounded"
             disabled={loading}
           >
             Cancel
