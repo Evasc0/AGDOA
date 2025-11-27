@@ -22,7 +22,7 @@ const BottomTabNav = () => {
           to={to}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center text-xs font-medium transition-colors duration-200
-            ${isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-zinc-400"}`
+            ${isActive ? "text-blue-600" : "text-gray-500"}`
           }
         >
           <Icon size={20} />
