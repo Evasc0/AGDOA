@@ -124,10 +124,177 @@ const App = () => {
   }, [db]);
 
   if (loading) {
+    const loaderCSS = `
+      .loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .car {
+        animation: speeder 0.4s linear infinite;
+        width: 900px;
+        height: 900px;
+      }
+      @media (max-width: 768px) {
+        .car {
+          width: 300px;
+          height: 300px;
+        }
+      }
+      .longfazers {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      .longfazers span {
+        position: absolute;
+        height: 2px;
+        width: 20%;
+        background: #000;
+      }
+      .longfazers span:nth-child(1) {
+        top: 20%;
+        animation: lf 0.6s linear infinite;
+        animation-delay: -5s;
+      }
+      .longfazers span:nth-child(2) {
+        top: 40%;
+        animation: lf2 0.8s linear infinite;
+        animation-delay: -1s;
+      }
+      .longfazers span:nth-child(3) {
+        top: 60%;
+        animation: lf3 0.6s linear infinite;
+      }
+      .longfazers span:nth-child(4) {
+        top: 80%;
+        animation: lf4 0.5s linear infinite;
+        animation-delay: -3s;
+      }
+      @keyframes lf {
+        0% {
+          left: 50%;
+          transform: translateY(0px);
+        }
+        25% {
+          transform: translateY(-10px);
+        }
+        50% {
+          transform: translateY(0px);
+        }
+        75% {
+          transform: translateY(10px);
+        }
+        100% {
+          left: -200%;
+          opacity: 0;
+          transform: translateY(0px);
+        }
+      }
+      @keyframes lf2 {
+        0% {
+          left: 50%;
+          transform: translateY(0px);
+        }
+        25% {
+          transform: translateY(10px);
+        }
+        50% {
+          transform: translateY(0px);
+        }
+        75% {
+          transform: translateY(-10px);
+        }
+        100% {
+          left: -200%;
+          opacity: 0;
+          transform: translateY(0px);
+        }
+      }
+      @keyframes lf3 {
+        0% {
+          left: 50%;
+          transform: translateY(0px);
+        }
+        25% {
+          transform: translateY(-10px);
+        }
+        50% {
+          transform: translateY(0px);
+        }
+        75% {
+          transform: translateY(10px);
+        }
+        100% {
+          left: -200%;
+          opacity: 0;
+          transform: translateY(0px);
+        }
+      }
+      @keyframes lf4 {
+        0% {
+          left: 50%;
+          transform: translateY(0px);
+        }
+        25% {
+          transform: translateY(10px);
+        }
+        50% {
+          transform: translateY(0px);
+        }
+        75% {
+          transform: translateY(-10px);
+        }
+        100% {
+          left: -200%;
+          opacity: 0;
+          transform: translateY(0px);
+        }
+      }
+      @keyframes speeder {
+        0% {
+          transform: translate(2px, 1px) rotate(0deg);
+        }
+        10% {
+          transform: translate(-1px, -3px) rotate(-1deg);
+        }
+        20% {
+          transform: translate(-2px, 0px) rotate(1deg);
+        }
+        30% {
+          transform: translate(1px, 2px) rotate(0deg);
+        }
+        40% {
+          transform: translate(1px, -1px) rotate(1deg);
+        }
+        50% {
+          transform: translate(-1px, 3px) rotate(-1deg);
+        }
+        60% {
+          transform: translate(-1px, 1px) rotate(0deg);
+        }
+        70% {
+          transform: translate(3px, 1px) rotate(-1deg);
+        }
+        80% {
+          transform: translate(-2px, -1px) rotate(1deg);
+        }
+        90% {
+          transform: translate(2px, 1px) rotate(0deg);
+        }
+        100% {
+          transform: translate(1px, -2px) rotate(-1deg);
+        }
+      }
+    `;
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-        <span className="ml-4">Loading...</span>
+      <div className="h-screen bg-white relative">
+        <style dangerouslySetInnerHTML={{ __html: loaderCSS }} />
+        <div className="loader">
+          <img src="/img/vecteezy_sports-car-logo-icon-motor-vehicle-silhouette-emblems-auto_.jpg" alt="car" className="car" />
+        </div>
       </div>
     );
   }
