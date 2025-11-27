@@ -249,17 +249,17 @@ const Login = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4">
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 text-gray-900 p-4">
       <Toaster position="top-center" />
-      <div className="bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-2 text-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md border border-gray-200">
+        <h1 className="text-2xl font-bold mb-2 text-center text-gray-900">
           {isSignUp ? "Sign Up" : "Login"}
         </h1>
 
         <input
           type="email"
           placeholder="Email"
-          className="w-full p-2 mb-3 bg-gray-700 rounded"
+          className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
@@ -269,7 +269,7 @@ const Login = () => {
         <input
           type={showPassword ? "text" : "password"}
           placeholder="Password"
-          className="w-full p-2 bg-gray-700 rounded pr-10"
+          className="w-full p-2 bg-gray-200 rounded border border-gray-300 pr-10 text-gray-900"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
@@ -279,7 +279,7 @@ const Login = () => {
         />
         <button
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-2 top-2 text-sm text-gray-400 hover:text-white"
+          className="absolute right-2 top-2 text-sm text-gray-600 hover:text-gray-900"
           type="button"
           aria-label={showPassword ? "Hide password" : "Show password"}
         >
@@ -295,7 +295,7 @@ const Login = () => {
             <input
               type="text"
               placeholder="Full Name"
-              className="w-full p-2 mb-3 bg-gray-700 rounded"
+              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="name"
@@ -303,14 +303,14 @@ const Login = () => {
             <input
               type="text"
               placeholder="Plate Number"
-              className="w-full p-2 mb-3 bg-gray-700 rounded"
+              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
               value={plate}
               onChange={(e) => setPlate(e.target.value)}
             />
             <input
               type="text"
               placeholder="Vehicle"
-              className="w-full p-2 mb-3 bg-gray-700 rounded"
+              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
               value={vehicle}
               onChange={(e) => setVehicle(e.target.value)}
             />
@@ -318,7 +318,7 @@ const Login = () => {
               <input
                 type="text"
                 placeholder="Phone Number (e.g., 09123456789)"
-                className="flex-1 p-2 bg-gray-700 rounded"
+                className="flex-1 p-2 bg-gray-200 rounded border border-gray-300 text-gray-900"
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
@@ -339,18 +339,18 @@ const Login = () => {
           className={`w-full py-2 px-4 mt-2 rounded font-semibold ${
             loading
               ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
+              : "bg-blue-500 hover:bg-blue-600"
+          } text-white`}
           type="button"
         >
           {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
         </button>
 
-        <p className="text-sm text-center text-gray-400 mt-4">
+        <p className="text-sm text-center text-gray-600 mt-4">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-blue-400 hover:underline"
+            className="text-blue-600 hover:underline"
             type="button"
           >
             {isSignUp ? "Login here" : "Register"}
