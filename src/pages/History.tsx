@@ -137,36 +137,53 @@ export default function History() {
   };
 
   return (
-    <div className="p-4 max-w-2xl mx-auto min-h-screen bg-gray-100 text-gray-900">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Ride History</h2>
-        <Button onClick={() => setIsFilterOpen(true)} className="gap-2">
-          <Filter className="w-4 h-4" /> Filter
-        </Button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-4 text-gray-900">
+      <div className="max-w-7xl mx-auto">
+        <div className="max-w-2xl mx-auto min-h-screen">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold animate-fade-in">Ride History</h2>
+            <Button
+              onClick={() => setIsFilterOpen(true)}
+              className="gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105"
+            >
+              <Filter className="w-4 h-4" /> Filter
+            </Button>
+          </div>
+
+          {filteredLogs.length === 0 ? (
+            <div className="bg-white p-8 rounded-xl shadow-lg text-center animate-fade-in-up">
+              <p className="text-gray-500 text-lg">No rides found.</p>
+            </div>
+          ) : (
+            <div className="space-y-4 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              {filteredLogs.map((log, index) => (
+                <div
+                  key={log.id}
+                  className="animate-slide-up"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <RideHistoryCard log={log} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <RideHistoryFilterModal
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+            onApply={handleApplyFilters}
+            onClear={handleClearFilters}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            dropoffLocation={dropoffLocation}
+            setDropoffLocation={setDropoffLocation}
+            minFare={minFare}
+            setMinFare={setMinFare}
+          />
+        </div>
       </div>
-
-      {filteredLogs.length === 0 ? (
-        <p className="text-center text-gray-400">No rides found.</p>
-      ) : (
-        filteredLogs.map(log => (
-          <RideHistoryCard key={log.id} log={log} />
-        ))
-      )}
-
-      <RideHistoryFilterModal
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-        startDate={startDate}
-        setStartDate={setStartDate}
-        endDate={endDate}
-        setEndDate={setEndDate}
-        dropoffLocation={dropoffLocation}
-        setDropoffLocation={setDropoffLocation}
-        minFare={minFare}
-        setMinFare={setMinFare}
-      />
     </div>
   );
 }

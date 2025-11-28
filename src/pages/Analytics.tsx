@@ -354,82 +354,91 @@ const Analytics: React.FC = () => {
   }, [filter, fetchPie, user]);
 
   return (
-    <div className="p-4 text-gray-900 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">📊 Analytics Dashboard</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-4 text-gray-900">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center animate-fade-in">📊 Analytics Dashboard</h1>
 
-      {alertMsg && <div className="bg-yellow-200 p-3 rounded-lg mb-6">{alertMsg}</div>}
-
-      {forecast.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 mb-8">
-          {forecast.map((day, i) => (
-            <div key={i} className="bg-blue-100 p-3 rounded-xl flex flex-col items-center shadow">
-              <p className="text-sm font-medium">{day.date}</p>
-              <div className="text-3xl my-2">{day.icon}</div>
-              <p className="font-bold">{day.temp.toFixed(1)}°C</p>
-              <p className="text-xs capitalize text-center">{day.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8 ">
-        <div className="bg-gray-200 p-5 rounded-lg text-center">
-          <div className=" text-3xl">🕒</div>
-          <p className="mt-2 font-semibold text-lg">Avg Wait Time</p>
-          <p className="text-xl">{avgWaitTime} mins</p>
-          <p className="text-xs italic mt-1">(Based on queued wait times recorded)</p>
-        </div>
-        <div className="bg-gray-200 p-5 rounded-lg text-center">
-          <div className="text-3xl">🚖</div>
-          <p className="mt-2 font-semibold text-lg">Rides Today</p>
-          <p className="text-xl">{ridesToday} <br />as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-        </div>
-        <div className="bg-gray-200 p-5 rounded-lg text-center">
-          <div className="text-3xl">🤑</div>
-          <p className="mt-2 font-semibold text-lg">Total Earnings</p>
-          <p className="text-xl">₱{earnings.toFixed(2)} <br />as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-        </div>
-      </div>
-
-      <div className="bg-gray-200 p-4 rounded-lg mb-8">
-        <h2 className="font-semibold mb-2">🏁 Top Drop-offs</h2>
-        {Object.entries(dropoffAreas).length ? (
-          <ul className="list-disc list-inside text-sm max-h-48 overflow-auto">
-            {Object.entries(dropoffAreas)
-              .sort(([, a], [, b]) => b.earnings - a.earnings)
-              .slice(0, 5)
-              .map(([area, data], i) => (
-                <li key={i}>
-                  {area} — {data.count} ride{data.count > 1 ? 's' : ''}, ₱{data.earnings.toFixed(2)}
-                </li>
-              ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-600">No drop-offs recorded yet.</p>
+        {alertMsg && (
+          <div className="bg-yellow-200 p-4 rounded-lg mb-6 shadow-lg animate-slide-down">
+            {alertMsg}
+          </div>
         )}
-      </div>
 
-      <div className="flex justify-center mb-8">
-        <button
-          onClick={() => {
-            fetchAnalytics();
-            fetchWeather();
-            fetchPie(filter);
-          }}
-          disabled={refreshing}
-          className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white px-6 py-2 rounded-full shadow-md transition"
-        >
-          {refreshing ? '🔄 Refreshing...' : '🔁 Refresh'}
-        </button>
-      </div>
+        {forecast.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 mb-8 animate-fade-in-up">
+            {forecast.map((day, i) => (
+              <div key={i} className="bg-white p-4 rounded-xl flex flex-col items-center shadow-lg hover:shadow-xl transition-shadow duration-300">
+                <p className="text-sm font-medium text-gray-700">{day.date}</p>
+                <div className="text-4xl my-2">{day.icon}</div>
+                <p className="font-bold text-lg">{day.temp.toFixed(1)}°C</p>
+                <p className="text-xs capitalize text-center text-gray-600">{day.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
-      <div className="bg-gray-100 p-6 rounded-xl shadow-lg">
-        <h2 className="text-lg font-semibold mb-4">📈 7-Day Ride & Earnings Trend</h2>
-        <div className="overflow-x-auto">
-          <div className="min-w-[320px] sm:min-w-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up">
+            <div className="text-4xl mb-2">🕒</div>
+            <p className="font-semibold text-xl mb-1">Avg Wait Time</p>
+            <p className="text-3xl font-bold text-blue-600">{avgWaitTime} mins</p>
+            <p className="text-xs text-gray-500 mt-2">(Based on queued wait times recorded)</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="text-4xl mb-2">🚖</div>
+            <p className="font-semibold text-xl mb-1">Rides Today</p>
+            <p className="text-3xl font-bold text-green-600">{ridesToday}</p>
+            <p className="text-xs text-gray-500 mt-2">as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <div className="text-4xl mb-2">🤑</div>
+            <p className="font-semibold text-xl mb-1">Total Earnings</p>
+            <p className="text-3xl font-bold text-yellow-600">₱{earnings.toFixed(2)}</p>
+            <p className="text-xs text-gray-500 mt-2">as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="bg-white p-6 rounded-xl shadow-lg animate-fade-in-left">
+            <h2 className="font-semibold text-xl mb-4">🏁 Top Drop-offs</h2>
+            {Object.entries(dropoffAreas).length ? (
+              <ul className="space-y-2">
+                {Object.entries(dropoffAreas)
+                  .sort(([, a], [, b]) => b.earnings - a.earnings)
+                  .slice(0, 5)
+                  .map(([area, data], i) => (
+                    <li key={i} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                      <span className="font-medium">{area}</span>
+                      <span className="text-sm text-gray-600">{data.count} ride{data.count > 1 ? 's' : ''}, ₱{data.earnings.toFixed(2)}</span>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500">No drop-offs recorded yet.</p>
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-lg flex items-center justify-center animate-fade-in-right">
+            <button
+              onClick={() => {
+                fetchAnalytics();
+                fetchWeather();
+                fetchPie(filter);
+              }}
+              disabled={refreshing}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 text-white px-8 py-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105"
+            >
+              {refreshing ? '🔄 Refreshing...' : '🔁 Refresh Data'}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-8 animate-fade-in-up">
+          <h2 className="text-xl font-semibold mb-6">📈 7-Day Ride & Earnings Trend</h2>
+          <div className="h-80">
             <Bar
               data={{
-                labels: dailyStats.map(s => s.date), // Use the actual date for the graph labels
+                labels: dailyStats.map(s => s.date),
                 datasets: [
                   {
                     label: 'Rides',
@@ -447,18 +456,19 @@ const Analytics: React.FC = () => {
               }}
               options={{
                 responsive: true,
+                maintainAspectRatio: false,
                 animation: {
-                  duration: 1200,
+                  duration: 1500,
                   easing: 'easeOutCubic',
                 },
                 scales: {
                   y: {
                     beginAtZero: true,
-                    ticks: { color: '#000' },
+                    ticks: { color: '#374151' },
                     grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                   x: {
-                    ticks: { color: '#000' },
+                    ticks: { color: '#374151' },
                     grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                 },
@@ -473,7 +483,7 @@ const Analytics: React.FC = () => {
                   },
                   legend: {
                     labels: {
-                      color: '#000',
+                      color: '#374151',
                     },
                   },
                 },
@@ -481,62 +491,60 @@ const Analytics: React.FC = () => {
             />
           </div>
         </div>
-      </div>
 
-      <div className="bg-gray-100 p-6 rounded-xl shadow-lg mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">📊 Ride & Earnings Breakdown</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => {
-                setIsFilterModalOpen(true);
-              }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Filter
-            </button>
-            <button
-              onClick={() => {
-                setFilter('weekly');
-                setCustomFilter(false);
-                fetchPie('weekly');
-              }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'weekly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Weekly
-            </button>
-            <button
-              onClick={() => {
-                setFilter('monthly');
-                setCustomFilter(false);
-                fetchPie('monthly');
-              }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'monthly' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => {
-                setFilter('annually');
-                setCustomFilter(false);
-                fetchPie('annually');
-              }}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
-                filter === 'annually' && !customFilter ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Annually
-            </button>
+        <div className="bg-white p-6 rounded-xl shadow-lg animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <h2 className="text-xl font-semibold mb-4 sm:mb-0">📊 Ride & Earnings Breakdown</h2>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setIsFilterModalOpen(true);
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  customFilter ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Filter
+              </button>
+              <button
+                onClick={() => {
+                  setFilter('weekly');
+                  setCustomFilter(false);
+                  fetchPie('weekly');
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  filter === 'weekly' && !customFilter ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Weekly
+              </button>
+              <button
+                onClick={() => {
+                  setFilter('monthly');
+                  setCustomFilter(false);
+                  fetchPie('monthly');
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  filter === 'monthly' && !customFilter ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => {
+                  setFilter('annually');
+                  setCustomFilter(false);
+                  fetchPie('annually');
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  filter === 'annually' && !customFilter ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Annually
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="flex justify-center">
-          <div className="w-full max-w-4xl">
+          <div className="h-96">
             <Line
               data={{
                 labels: pieStats.map(s => s.label),
@@ -567,17 +575,17 @@ const Analytics: React.FC = () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: {
-                  duration: 1200,
+                  duration: 1500,
                   easing: 'easeOutCubic',
                 },
                 scales: {
                   y: {
                     beginAtZero: true,
-                    ticks: { color: '#000' },
+                    ticks: { color: '#374151' },
                     grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                   x: {
-                    ticks: { color: '#000' },
+                    ticks: { color: '#374151' },
                     grid: { color: 'rgba(0, 0, 0, 0.1)' },
                   },
                 },
@@ -593,7 +601,7 @@ const Analytics: React.FC = () => {
                   },
                   legend: {
                     labels: {
-                      color: '#000',
+                      color: '#374151',
                     },
                   },
                   zoom: {
@@ -616,21 +624,21 @@ const Analytics: React.FC = () => {
             />
           </div>
         </div>
-      </div>
 
-      {isFilterModalOpen && (
-        <AnalyticsFilterModal
-          isOpen={isFilterModalOpen}
-          onClose={() => setIsFilterModalOpen(false)}
-          onApply={(start: Date | null, end: Date | null) => {
-            setStartDate(start);
-            setEndDate(end);
-            setCustomFilter(true);
-            fetchPie('weekly', start, end);
-            setIsFilterModalOpen(false);
-          }}
-        />
-      )}
+        {isFilterModalOpen && (
+          <AnalyticsFilterModal
+            isOpen={isFilterModalOpen}
+            onClose={() => setIsFilterModalOpen(false)}
+            onApply={(start: Date | null, end: Date | null) => {
+              setStartDate(start);
+              setEndDate(end);
+              setCustomFilter(true);
+              fetchPie('weekly', start, end);
+              setIsFilterModalOpen(false);
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 };
