@@ -15,11 +15,12 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
 // Register Chart.js components
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler, zoomPlugin);
 
 const OPENWEATHER_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
 
@@ -42,18 +43,6 @@ const weatherToEmoji = (desc: string): string => {
 };
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
-
-// Define distinct color arrays for different time periods
-const dailyColors = [
-  '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#800080'
-];
-const weeklyColors = [
-  '#FF6347', '#32CD32', '#1E90FF', '#FFD700'
-];
-const monthlyColors = [
-  '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#800080',
-  '#FFA500', '#A52A2A', '#808080', '#000080', '#008080'
-];
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
@@ -602,6 +591,21 @@ const Analytics: React.FC = () => {
                   legend: {
                     labels: {
                       color: '#374151',
+                    },
+                  },
+                  zoom: {
+                    zoom: {
+                      wheel: {
+                        enabled: true,
+                      },
+                      pinch: {
+                        enabled: false,
+                      },
+                      mode: 'x',
+                    },
+                    pan: {
+                      enabled: true,
+                      mode: 'x',
                     },
                   },
                 },
