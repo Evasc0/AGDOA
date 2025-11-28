@@ -15,12 +15,11 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
-import zoomPlugin from 'chartjs-plugin-zoom/dist/chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
 // Register Chart.js components
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler, zoomPlugin);
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
 
 const OPENWEATHER_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
 
@@ -593,22 +592,7 @@ const Analytics: React.FC = () => {
                       color: '#374151',
                     },
                   },
-                  zoom: {
-                    zoom: {
-                      wheel: {
-                        enabled: true,
-                      },
-                      pinch: {
-                        enabled: false,
-                      },
-                      mode: 'x',
-                    },
-                    pan: {
-                      enabled: true,
-                      mode: 'x',
-                    },
-                  },
-                } as any,
+                },
               }}
             />
           </div>

@@ -8,12 +8,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          chartjs: ['chart.js', 'react-chartjs-2', 'chartjs-plugin-zoom'],
+          chartjs: ['chart.js', 'react-chartjs-2'],
         },
       },
     },
   },
   optimizeDeps: {
-    include: ['chart.js', 'react-chartjs-2', 'chartjs-plugin-zoom'],
+    include: ['chart.js', 'react-chartjs-2'],
   },
 });
