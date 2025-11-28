@@ -122,7 +122,7 @@ const Profile = () => {
   const profileUrl = `${window.location.origin}/driver/${user?.uid}`;
 
   return (
-    <div className="flex justify-center p-4 bg-gray-100 min-h-screen text-gray-900">
+    <div className="flex justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-4 text-gray-900">
       <AnimatePresence>
         {!isLoggingOut && (
           <motion.div
