@@ -816,6 +816,7 @@ const Analytics: React.FC = () => {
                   },
                   pan: {
                     enabled: true,
+                    mode: 'x'
                   },
                   responsive: [{
                     breakpoint: 480,

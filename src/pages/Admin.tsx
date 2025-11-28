@@ -1221,7 +1221,7 @@ className={`px-4 py-2 rounded ${
                     responsive: true,
                     scales: {
                       y: {
-                        min: 0,
+                        beginAtZero: true,
                       },
                     },
                     plugins: {
@@ -1233,11 +1233,11 @@ className={`px-4 py-2 rounded ${
                           pinch: {
                             enabled: true,
                           },
-                          mode: 'xy',
+                          mode: 'x',
                         },
                         pan: {
                           enabled: true,
-                          mode: 'xy',
+                          mode: 'x',
                         },
                       },
                       legend: {
