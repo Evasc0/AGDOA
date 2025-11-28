@@ -581,7 +581,7 @@ const Analytics: React.FC = () => {
                 plugins: {
                   tooltip: {
                     callbacks: {
-                      label: (tooltipItem) => {
+                      label: (tooltipItem: any) => {
                         const label = tooltipItem.dataset.label || 'Unknown';
                         const value = tooltipItem.parsed.y;
                         return `${label}: ${value}`;
@@ -608,7 +608,7 @@ const Analytics: React.FC = () => {
                       mode: 'x',
                     },
                   },
-                },
+                } as any,
               }}
             />
           </div>
