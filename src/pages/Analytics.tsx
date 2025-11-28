@@ -18,7 +18,6 @@ import { Bar, Pie, Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
-import 'chartjs-plugin-zoom';
 
 // Register Chart.js components
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler, zoomPlugin);
