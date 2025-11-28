@@ -373,10 +373,10 @@ const Analytics: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up">
-            <p className="font-semibold text-xl mb-4">Avg Wait Time</p>
-            <div className="h-48">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg text-center animate-slide-up">
+            <p className="font-semibold text-lg md:text-xl mb-3 md:mb-4">Avg Wait Time</p>
+            <div className="h-40 md:h-48">
               <ReactApexChart
                 options={{
                   chart: {
@@ -481,15 +481,95 @@ const Analytics: React.FC = () => {
             </div>
             <p className="text-xs text-gray-500 mt-2">(Based on queued wait times recorded)</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="text-4xl mb-2">🚖</div>
-            <p className="font-semibold text-xl mb-1">Rides Today</p>
-            <p className="text-3xl font-bold text-green-600">{ridesToday}</p>
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="text-4xl mb-2"></div>
+            <p className="font-semibold text-lg md:text-xl mb-3 md:mb-4">Rides Today</p>
+            <div className="h-40 md:h-48">
+              <ReactApexChart
+                options={{
+                  chart: {
+                    type: 'radialBar',
+                    height: 200,
+                  },
+                  plotOptions: {
+                    radialBar: {
+                      startAngle: -135,
+                      endAngle: 135,
+                      hollow: {
+                        margin: 0,
+                        size: '70%',
+                        background: '#fff',
+                        image: undefined,
+                        imageOffsetX: 0,
+                        imageOffsetY: 0,
+                        position: 'front',
+                        dropShadow: {
+                          enabled: true,
+                          top: 3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.24
+                        }
+                      },
+                      track: {
+                        background: '#fff',
+                        strokeWidth: '67%',
+                        margin: 0,
+                        dropShadow: {
+                          enabled: true,
+                          top: -3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.35
+                        }
+                      },
+                      dataLabels: {
+                        show: true,
+                        name: {
+                          offsetY: -10,
+                          show: true,
+                          color: '#888',
+                          fontSize: '17px'
+                        },
+                        value: {
+                          formatter: function(val: any) {
+                            return ridesToday.toString();
+                          },
+                          color: '#111',
+                          fontSize: '36px',
+                          show: true,
+                        }
+                      }
+                    }
+                  },
+                  fill: {
+                    type: 'gradient',
+                    gradient: {
+                      shade: 'dark',
+                      type: 'horizontal',
+                      shadeIntensity: 0.5,
+                      gradientToColors: ['#ABE5A1'],
+                      inverseColors: true,
+                      opacityFrom: 1,
+                      opacityTo: 1,
+                      stops: [0, 100]
+                    }
+                  },
+                  stroke: {
+                    lineCap: 'round'
+                  },
+                  labels: ['Rides Today'],
+                }}
+                series={[Math.min((ridesToday / 15) * 100, 100)]}
+                type="radialBar"
+                height={200}
+              />
+            </div>
             <p className="text-xs text-gray-500 mt-2">as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
           </div>
-          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <p className="font-semibold text-lg sm:text-xl mb-4">Earnings Overview</p>
-            <div className="h-32 sm:h-48">
+          <div className="bg-white p-4 md:p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <p className="font-semibold text-lg md:text-xl mb-3 md:mb-4">Earnings Overview</p>
+            <div className="h-40 md:h-48">
               <ReactApexChart
                 options={{
                   chart: {
@@ -534,17 +614,17 @@ const Analytics: React.FC = () => {
                           offsetY: -30,
                           show: true,
                           color: '#888',
-                          fontSize: '10px'
+                          fontSize: '17px'
                         },
                         value: {
                           formatter: function(val: any) {
-                            return '₱' + parseInt(val).toLocaleString();
+                            return '₱' + earnings.toLocaleString();
                           },
                           color: '#111',
-                          fontSize: '14px',
+                          fontSize: '24px',
                           show: true,
                           offsetY: -10,
-                        },
+                        }
                       }
                     }
                   },
@@ -564,9 +644,9 @@ const Analytics: React.FC = () => {
                   stroke: {
                     lineCap: 'round'
                   },
-                  labels: ['Total Earning', 'Estimated Earning'],
+                  labels: ['Earnings'],
                 }}
-                series={[earnings, forecastedEarnings]}
+                series={[forecastedEarnings > 0 ? Math.min((earnings / forecastedEarnings) * 100, 100) : 0]}
                 type="radialBar"
                 height={200}
               />
