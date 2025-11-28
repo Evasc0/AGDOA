@@ -5,5 +5,8 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist', // <- this is default, but be explicit
+    rollupOptions: {
+      external: ['chartjs-plugin-zoom'],
+    },
   },
 });
