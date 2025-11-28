@@ -5,5 +5,15 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist', // <- this is default, but be explicit
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          chartjs: ['chart.js', 'react-chartjs-2', 'chartjs-plugin-zoom'],
+        },
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['chart.js', 'react-chartjs-2', 'chartjs-plugin-zoom'],
   },
 });
