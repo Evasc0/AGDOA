@@ -15,7 +15,7 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
-import zoomPlugin from 'chartjs-plugin-zoom';
+import zoomPlugin from 'chartjs-plugin-zoom/dist/chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
