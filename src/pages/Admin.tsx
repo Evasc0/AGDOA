@@ -142,6 +142,7 @@ const Admin = () => {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalRides, setTotalRides] = useState(0);
   const [lineChartData, setLineChartData] = useState<{ categories: string[], series: { name: string, data: number[] }[] }>({ categories: [], series: [] });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   const [showAnalyticsFilterModal, setShowAnalyticsFilterModal] = useState(false);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<Date | null>(null);
@@ -523,6 +524,7 @@ const Admin = () => {
 
   // Fetch analytics data
   const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
     try {
       const ridesQuery = query(collection(db, "ride_logs"), orderBy("timestamp", "desc"));
       const ridesSnap = await getDocs(ridesQuery);
@@ -677,8 +679,10 @@ const Admin = () => {
         return { name: driver.name, data };
       });
       setLineChartData({ categories: categories.map(c => c.label), series });
+      setAnalyticsLoading(false);
     } catch (error: any) {
       toast.error("Failed to fetch analytics: " + error.message);
+      setAnalyticsLoading(false);
     }
   };
 
