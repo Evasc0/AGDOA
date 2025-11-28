@@ -42,16 +42,19 @@ import { CSS } from "@dnd-kit/utilities";
 import { useNavigate } from "react-router-dom";
 import {
   Chart as ChartJS,
-  ArcElement,
+  LineElement,
+  PointElement,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Pie } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { fareMatrix } from '../utils/fareMatrix';
 import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut } from 'lucide-react';
+import ApexCharts from 'apexcharts';
+import ReactApexChart from 'react-apexcharts';
 
 // Register Chart.js components
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(LineElement, PointElement, Tooltip, Legend);
 
 
 
@@ -137,6 +140,7 @@ const Admin = () => {
   const [driverPieStats, setDriverPieStats] = useState<Record<string, { label: string; earnings: number; rides: number }[]>>({});
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalRides, setTotalRides] = useState(0);
+  const [lineChartData, setLineChartData] = useState<{ categories: string[], series: { name: string, data: number[] }[] }>({ categories: [], series: [] });
 
   const [showAnalyticsFilterModal, setShowAnalyticsFilterModal] = useState(false);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<Date | null>(null);
@@ -611,6 +615,35 @@ const Admin = () => {
       setDriverPieStats(driverStats);
       setTotalEarnings(totalEarnings);
       setTotalRides(totalRides);
+
+      // Calculate line chart data for earnings over time
+      const dateMap: Record<string, Record<string, { earnings: number; rides: number }>> = {};
+      filteredRides.forEach((ride) => {
+        const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+        const dateKey = rideDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        if (!dateMap[dateKey]) dateMap[dateKey] = {};
+        const driverId = ride.driverId;
+        if (!dateMap[dateKey][driverId]) {
+          dateMap[dateKey][driverId] = { earnings: 0, rides: 0 };
+        }
+        const dropoffNameRaw = ride.dropoffName || "";
+        const dropoffName = dropoffNameRaw.trim();
+        const normalizedFareMatrix: Record<string, number> = {};
+        Object.entries(fareMatrix).forEach(([key, val]) => {
+          normalizedFareMatrix[normalizeKey(key)] = val;
+        });
+        const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+        dateMap[dateKey][driverId].earnings += fare;
+        dateMap[dateKey][driverId].rides += 1;
+      });
+
+      // Create categories and series for line chart
+      const categories = Object.keys(dateMap).sort();
+      const series = drivers.map((driver) => {
+        const data = categories.map((date) => dateMap[date]?.[driver.id]?.earnings || 0);
+        return { name: driver.name, data };
+      });
+      setLineChartData({ categories, series });
     } catch (error: any) {
       toast.error("Failed to fetch analytics: " + error.message);
     }
@@ -1138,27 +1171,28 @@ className={`px-4 py-2 rounded ${
           {/* Overall Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-white p-4 rounded border border-gray-300">
-              <h3 className="text-md font-semibold mb-2 text-gray-900">Overall Statistics</h3>
-              {allPieStats.length > 0 && (
-                <Pie
+              <h3 className="text-md font-semibold mb-2 text-gray-900">Earnings Over Time</h3>
+              {lineChartData.categories.length > 0 && (
+                <Line
                   data={{
-                    labels: allPieStats.map(stat => stat.label),
-                    datasets: [{
-                      data: allPieStats.map(stat => stat.earnings),
-                      backgroundColor: pieColors,
-                      borderColor: pieColors,
-                      borderWidth: 1,
-                    }],
+                    labels: lineChartData.categories,
+                    datasets: lineChartData.series.map((s, index) => ({
+                      label: s.name,
+                      data: s.data,
+                      borderColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
+                      backgroundColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
+                      tension: 0.1,
+                    })),
                   }}
                   options={{
                     responsive: true,
                     plugins: {
                       legend: {
-                        position: 'bottom',
+                        position: 'top',
                       },
                       tooltip: {
                         callbacks: {
-                          label: (context) => `${context.label}: ₱${context.parsed}`,
+                          label: (context) => `${context.dataset.label}: ₱${context.parsed.y}`,
                         },
                       },
                     },
