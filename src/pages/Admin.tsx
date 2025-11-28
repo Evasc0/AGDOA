@@ -48,13 +48,14 @@ import {
   Legend,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut } from 'lucide-react';
 import ApexCharts from 'apexcharts';
 import ReactApexChart from 'react-apexcharts';
 
 // Register Chart.js components
-ChartJS.register(LineElement, PointElement, Tooltip, Legend);
+ChartJS.register(LineElement, PointElement, Tooltip, Legend, zoomPlugin);
 
 
 
@@ -1201,7 +1202,7 @@ className={`px-4 py-2 rounded ${
           </div>
 
           {/* Overall Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="space-y-6 mb-6">
             <div className="bg-white p-4 rounded border border-gray-300">
               <h3 className="text-md font-semibold mb-2 text-gray-900">Earnings Over Time</h3>
               {lineChartData.categories.length > 0 && (
@@ -1218,7 +1219,27 @@ className={`px-4 py-2 rounded ${
                   }}
                   options={{
                     responsive: true,
+                    scales: {
+                      y: {
+                        min: 0,
+                      },
+                    },
                     plugins: {
+                      zoom: {
+                        zoom: {
+                          wheel: {
+                            enabled: true,
+                          },
+                          pinch: {
+                            enabled: true,
+                          },
+                          mode: 'xy',
+                        },
+                        pan: {
+                          enabled: true,
+                          mode: 'xy',
+                        },
+                      },
                       legend: {
                         position: 'top',
                       },
