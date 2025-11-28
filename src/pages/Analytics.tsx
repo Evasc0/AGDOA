@@ -15,6 +15,8 @@ import {
   Filler
 } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
+import ApexCharts from 'apexcharts';
+import ReactApexChart from 'react-apexcharts';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
@@ -50,6 +52,7 @@ const Analytics: React.FC = () => {
   const [avgWaitTime, setAvgWaitTime] = useState(0);
   const [ridesToday, setRidesToday] = useState(0);
   const [earnings, setEarnings] = useState(0);
+  const [forecastedEarnings, setForecastedEarnings] = useState(0);
   const [dropoffAreas, setDropoffAreas] = useState<Record<string, { count: number; earnings: number }>>({});
   const [alertMsg, setAlertMsg] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -185,7 +188,12 @@ const Analytics: React.FC = () => {
     // Set today's rides and earnings
     setRidesToday(todayRidesCount);
     setEarnings(todayEarnings);
-    
+
+    // Calculate forecasted earnings (average of past 7 days)
+    const totalPastEarnings = Object.values(statMap).reduce((sum, day) => sum + day.earnings, 0);
+    const avgDailyEarnings = totalPastEarnings / 7;
+    setForecastedEarnings(avgDailyEarnings);
+
     // Calculate average wait time for the past 7 days
     setAvgWaitTime(
       ridesWithWaitTimeCount ? Math.round(totalWaitTime / ridesWithWaitTimeCount) : 0
@@ -367,9 +375,110 @@ const Analytics: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up">
-            <div className="text-4xl mb-2">🕒</div>
-            <p className="font-semibold text-xl mb-1">Avg Wait Time</p>
-            <p className="text-3xl font-bold text-blue-600">{avgWaitTime} mins</p>
+            <p className="font-semibold text-xl mb-4">Avg Wait Time</p>
+            <div className="h-48">
+              <ReactApexChart
+                options={{
+                  chart: {
+                    type: 'radialBar',
+                    height: 200,
+                  },
+                  plotOptions: {
+                    radialBar: {
+                      startAngle: -135,
+                      endAngle: 135,
+                      hollow: {
+                        margin: 0,
+                        size: '70%',
+                        background: '#fff',
+                        image: undefined,
+                        imageOffsetX: 0,
+                        imageOffsetY: 0,
+                        position: 'front',
+                        dropShadow: {
+                          enabled: true,
+                          top: 3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.24
+                        }
+                      },
+                      track: {
+                        background: '#fff',
+                        strokeWidth: '67%',
+                        margin: 0,
+                        dropShadow: {
+                          enabled: true,
+                          top: -3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.35
+                        }
+                      },
+                      dataLabels: {
+                        show: true,
+                        name: {
+                          offsetY: -10,
+                          show: true,
+                          color: '#888',
+                          fontSize: '17px'
+                        },
+                        value: {
+                          formatter: function(val: any) {
+                            return parseInt(val) + ' mins';
+                          },
+                          color: '#111',
+                          fontSize: '36px',
+                          show: true,
+                        }
+                      }
+                    }
+                  },
+                  fill: {
+                    type: 'gradient',
+                    gradient: {
+                      shade: 'dark',
+                      type: 'horizontal',
+                      shadeIntensity: 0.5,
+                      gradientToColors: ['#ABE5A1'],
+                      inverseColors: true,
+                      opacityFrom: 1,
+                      opacityTo: 1,
+                      stops: [0, 100]
+                    }
+                  },
+                  stroke: {
+                    lineCap: 'round'
+                  },
+                  labels: ['Avg Wait Time'],
+                  annotations: {
+                    points: [{
+                      x: 'Avg Wait Time',
+                      y: 10, // Target value
+                      marker: {
+                        size: 8,
+                        fillColor: '#FF4560',
+                        strokeColor: '#fff',
+                        strokeWidth: 2,
+                        shape: 'circle'
+                      },
+                      label: {
+                        borderColor: '#FF4560',
+                        offsetY: 0,
+                        style: {
+                          color: '#fff',
+                          background: '#FF4560',
+                        },
+                        text: 'Target: 10 mins'
+                      }
+                    }]
+                  }
+                }}
+                series={[Math.min((avgWaitTime / 20) * 100, 100)]} // Assuming max 20 mins for full gauge
+                type="radialBar"
+                height={200}
+              />
+            </div>
             <p className="text-xs text-gray-500 mt-2">(Based on queued wait times recorded)</p>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -378,11 +487,94 @@ const Analytics: React.FC = () => {
             <p className="text-3xl font-bold text-green-600">{ridesToday}</p>
             <p className="text-xs text-gray-500 mt-2">as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <div className="text-4xl mb-2">🤑</div>
-            <p className="font-semibold text-xl mb-1">Total Earnings</p>
-            <p className="text-3xl font-bold text-yellow-600">₱{earnings.toFixed(2)}</p>
-            <p className="text-xs text-gray-500 mt-2">as of {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+          <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg text-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
+            <p className="font-semibold text-lg sm:text-xl mb-4">Earnings Overview</p>
+            <div className="h-32 sm:h-48">
+              <ReactApexChart
+                options={{
+                  chart: {
+                    type: 'radialBar',
+                    height: 200,
+                  },
+                  plotOptions: {
+                    radialBar: {
+                      startAngle: -135,
+                      endAngle: 135,
+                      hollow: {
+                        margin: 0,
+                        size: '70%',
+                        background: '#fff',
+                        image: undefined,
+                        imageOffsetX: 0,
+                        imageOffsetY: 0,
+                        position: 'front',
+                        dropShadow: {
+                          enabled: true,
+                          top: 3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.24
+                        }
+                      },
+                      track: {
+                        background: '#fff',
+                        strokeWidth: '67%',
+                        margin: 0,
+                        dropShadow: {
+                          enabled: true,
+                          top: -3,
+                          left: 0,
+                          blur: 4,
+                          opacity: 0.35
+                        }
+                      },
+                      dataLabels: {
+                        show: true,
+                        name: {
+                          offsetY: -30,
+                          show: true,
+                          color: '#888',
+                          fontSize: '10px'
+                        },
+                        value: {
+                          formatter: function(val: any) {
+                            return '₱' + parseInt(val).toLocaleString();
+                          },
+                          color: '#111',
+                          fontSize: '14px',
+                          show: true,
+                          offsetY: -10,
+                        },
+                      }
+                    }
+                  },
+                  fill: {
+                    type: 'gradient',
+                    gradient: {
+                      shade: 'dark',
+                      type: 'horizontal',
+                      shadeIntensity: 0.5,
+                      gradientToColors: ['#ABE5A1'],
+                      inverseColors: true,
+                      opacityFrom: 1,
+                      opacityTo: 1,
+                      stops: [0, 100]
+                    }
+                  },
+                  stroke: {
+                    lineCap: 'round'
+                  },
+                  labels: ['Total Earning', 'Estimated Earning'],
+                }}
+                series={[earnings, forecastedEarnings]}
+                type="radialBar"
+                height={200}
+              />
+            </div>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700">₱{earnings.toFixed(2)} / ₱{forecastedEarnings.toFixed(2)}</p>
+              <p className="text-xs text-gray-500">Today's earnings toward forecast</p>
+            </div>
           </div>
         </div>
 
@@ -439,6 +631,7 @@ const Analytics: React.FC = () => {
                     data: dailyStats.map(s => s.earnings),
                     backgroundColor: '#10b981',
                     borderRadius: 6,
+                    hidden: true,
                   },
                 ]
               }}
