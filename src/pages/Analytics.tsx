@@ -9,14 +9,17 @@ import {
   LinearScale,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  PointElement,
+  LineElement
 } from 'chart.js';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 
 // Register Chart.js components
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement);
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, zoomPlugin);
 
 const OPENWEATHER_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
 
@@ -533,49 +536,79 @@ const Analytics: React.FC = () => {
           </div>
         </div>
         <div className="flex justify-center">
-          <div className="w-full max-w-md">
-            <Pie
+          <div className="w-full max-w-4xl">
+            <Line
               data={{
                 labels: pieStats.map(s => s.label),
                 datasets: [
                   {
                     label: 'Earnings (₱)',
                     data: pieStats.map(s => s.earnings),
-                    backgroundColor: (() => {
-                      if (filter === 'weekly') {
-                        return dailyColors.slice(0, pieStats.length);
-                      } else if (filter === 'monthly') {
-                        return weeklyColors.slice(0, pieStats.length);
-                      } else if (filter === 'annually') {
-                        return monthlyColors.slice(0, pieStats.length);
-                      } else {
-                        return ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6b7280'].slice(0, pieStats.length);
-                      }
-                    })(),
-                    borderWidth: 2,
-                    borderColor: '#e5e7eb',
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#10b981',
+                  },
+                  {
+                    label: 'Rides',
+                    data: pieStats.map(s => s.rides),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#3b82f6',
                   },
                 ]
               }}
               options={{
                 responsive: true,
+                maintainAspectRatio: false,
                 animation: {
                   duration: 1200,
                   easing: 'easeOutCubic',
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: { color: '#000' },
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                  },
+                  x: {
+                    ticks: { color: '#000' },
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                  },
                 },
                 plugins: {
                   tooltip: {
                     callbacks: {
                       label: (tooltipItem) => {
-                        const label = tooltipItem.label || 'Unknown';
-                        const value = tooltipItem.parsed;
-                        return `${label}: ₱${value.toFixed(2)}`;
+                        const label = tooltipItem.dataset.label || 'Unknown';
+                        const value = tooltipItem.parsed.y;
+                        return `${label}: ${value}`;
                       },
                     },
                   },
                   legend: {
                     labels: {
                       color: '#000',
+                    },
+                  },
+                  zoom: {
+                    zoom: {
+                      wheel: {
+                        enabled: true,
+                      },
+                      pinch: {
+                        enabled: true,
+                      },
+                      mode: 'x',
+                    },
+                    pan: {
+                      enabled: true,
+                      mode: 'x',
                     },
                   },
                 },
