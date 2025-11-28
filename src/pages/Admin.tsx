@@ -723,20 +723,20 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-white">
       {/* Sidebar */}
-      <div className={`fixed top-0 left-0 h-full bg-gray-100 text-gray-900 transition-all duration-300 overflow-hidden overscroll-none z-10 ${sidebarOpen ? 'w-full md:w-64' : 'w-0'}`}>
-        <div className="p-4 h-full flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Admin Panel</h2>
+      <div className={`fixed top-0 left-0 h-full bg-white text-gray-900 transition-all duration-300 overflow-hidden overscroll-none z-10 ${sidebarOpen ? 'w-full md:w-64' : 'w-0'}`}>
+        <div className="p-6 h-full flex flex-col">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-semibold">Admin Panel</h2>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-gray-200 rounded"
+              className="p-2 hover:bg-gray-100 rounded-lg"
             >
               ✕
             </button>
           </div>
-          <nav className="space-y-2 flex-1 overflow-hidden">
+          <nav className="space-y-3 flex-1 overflow-hidden">
             {[
               { type: "analytics", label: "Analytics", icon: BarChart3 },
               { type: "drivers", label: "Drivers", icon: Users },
@@ -749,26 +749,26 @@ const Admin = () => {
               <button
                 key={type}
                 onClick={() => setTab(type as any)}
-                className={`w-full text-left px-3 py-2 rounded flex items-center gap-2 ${
-                  tab === type ? "bg-blue-600 text-white" : "hover:bg-gray-200"
+                className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${
+                  tab === type ? "bg-blue-600 text-white" : "hover:bg-gray-100"
                 }`}
               >
-                <Icon size={18} />
+                <Icon size={20} />
                 {label}
                 {type === "pending" && pendingDrivers.length > 0 && (
-                  <span className="ml-auto bg-red-600 text-xs rounded-full px-1.5">
+                  <span className="ml-auto bg-red-600 text-xs rounded-full px-2 py-1">
                     {pendingDrivers.length}
                   </span>
                 )}
               </button>
             ))}
           </nav>
-          <div className="mt-auto">
+          <div className="mt-auto pt-4">
             <button
               onClick={handleLogout}
-              className="w-full px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+              className="w-full px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center gap-3 transition-colors"
             >
-              <LogOut size={18} />
+              <LogOut size={20} />
               Logout
             </button>
           </div>
