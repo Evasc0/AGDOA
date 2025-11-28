@@ -135,7 +135,7 @@ const Admin = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
-  const [analyticsFilter, setAnalyticsFilter] = useState<'daily' | 'weekly' | 'monthly' | 'annually' | 'custom'>('weekly');
+  const [analyticsFilter, setAnalyticsFilter] = useState<'weekly' | 'monthly' | 'annually' | 'custom'>('weekly');
   const [allPieStats, setAllPieStats] = useState<{ label: string; earnings: number; rides: number }[]>([]);
   const [driverPieStats, setDriverPieStats] = useState<Record<string, { label: string; earnings: number; rides: number }[]>>({});
   const [totalEarnings, setTotalEarnings] = useState(0);
@@ -540,17 +540,14 @@ const Admin = () => {
         });
       } else {
         switch (analyticsFilter) {
-          case 'daily':
-            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            break;
           case 'weekly':
             startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             break;
           case 'monthly':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             break;
           case 'annually':
-            startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
             break;
           default:
             startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -620,7 +617,12 @@ const Admin = () => {
       const dateMap: Record<string, Record<string, { earnings: number; rides: number }>> = {};
       filteredRides.forEach((ride) => {
         const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
-        const dateKey = rideDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        let dateKey: string;
+        if (analyticsFilter === 'annually') {
+          dateKey = rideDate.toISOString().slice(0, 7); // YYYY-MM
+        } else {
+          dateKey = rideDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        }
         if (!dateMap[dateKey]) dateMap[dateKey] = {};
         const driverId = ride.driverId;
         if (!dateMap[dateKey][driverId]) {
@@ -637,13 +639,43 @@ const Admin = () => {
         dateMap[dateKey][driverId].rides += 1;
       });
 
-      // Create categories and series for line chart
-      const categories = Object.keys(dateMap).sort();
+      // Generate categories with all dates/months in the period
+      let categories: { key: string; label: string }[] = [];
+      if (analyticsFilter === 'weekly') {
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(now.getDate() - i);
+          const key = date.toISOString().split('T')[0];
+          const label = date.getDate().toString();
+          categories.push({ key, label });
+        }
+      } else if (analyticsFilter === 'monthly') {
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(now.getDate() - i);
+          const key = date.toISOString().split('T')[0];
+          const label = date.getDate().toString();
+          categories.push({ key, label });
+        }
+      } else if (analyticsFilter === 'annually') {
+        for (let i = 11; i >= 0; i--) {
+          const date = new Date(now);
+          date.setMonth(now.getMonth() - i);
+          const key = date.toISOString().slice(0, 7);
+          const label = date.toLocaleString('en-US', { month: 'short' });
+          categories.push({ key, label });
+        }
+      } else {
+        // For custom or default, use existing logic
+        categories = Object.keys(dateMap).sort().map(key => ({ key, label: key }));
+      }
+
+      // Create series for line chart
       const series = drivers.map((driver) => {
-        const data = categories.map((date) => dateMap[date]?.[driver.id]?.earnings || 0);
+        const data = categories.map((cat) => dateMap[cat.key]?.[driver.id]?.earnings || 0);
         return { name: driver.name, data };
       });
-      setLineChartData({ categories, series });
+      setLineChartData({ categories: categories.map(c => c.label), series });
     } catch (error: any) {
       toast.error("Failed to fetch analytics: " + error.message);
     }
@@ -1147,7 +1179,7 @@ const Admin = () => {
 
           {/* Filter Buttons */}
           <div className="flex gap-2 mb-6">
-          {['daily', 'weekly', 'monthly', 'annually'].map((filter) => (
+          {['weekly', 'monthly', 'annually'].map((filter) => (
               <button
                 key={filter}
                 onClick={() => setAnalyticsFilter(filter as any)}
