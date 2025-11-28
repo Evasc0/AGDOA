@@ -6,4 +6,7 @@ export default defineConfig({
   build: {
     outDir: 'dist', // <- this is default, but be explicit
   },
+  optimizeDeps: {
+    exclude: ['chartjs-plugin-zoom', 'hammerjs'],
+  },
 });
