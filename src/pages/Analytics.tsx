@@ -806,67 +806,98 @@ const Analytics: React.FC = () => {
             </div>
           </div>
           <div className="h-96">
-            <Line
-              data={{
-                labels: pieStats.map(s => s.label),
-                datasets: [
-                  {
-                    label: 'Earnings (₱)',
-                    data: pieStats.map(s => s.earnings),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#10b981',
-                    pointBorderColor: '#10b981',
-                  },
-                  {
-                    label: 'Rides',
-                    data: pieStats.map(s => s.rides),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#3b82f6',
-                    pointBorderColor: '#3b82f6',
-                  },
-                ]
-              }}
+            <ReactApexChart
               options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                  duration: 1500,
-                  easing: 'easeOutCubic',
+                chart: {
+                  type: 'line',
+                  zoom: {
+                    enabled: true,
+                    type: 'x'
+                  },
+                  pan: {
+                    enabled: true,
+                  },
+                  responsive: [{
+                    breakpoint: 480,
+                    options: {
+                      legend: {
+                        position: 'bottom',
+                        offsetX: -10,
+                        offsetY: 0
+                      }
+                    }
+                  }]
+                } as any,
+                dataLabels: {
+                  enabled: false
                 },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    ticks: { color: '#374151' },
-                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
-                  },
-                  x: {
-                    ticks: { color: '#374151' },
-                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
-                  },
+                stroke: {
+                  curve: 'smooth'
                 },
-                plugins: {
-                  tooltip: {
-                    callbacks: {
-                      label: (tooltipItem: any) => {
-                        const label = tooltipItem.dataset.label || 'Unknown';
-                        const value = tooltipItem.parsed.y;
-                        return `${label}: ${value}`;
-                      },
-                    },
-                  },
-                  legend: {
-                    labels: {
-                      color: '#374151',
-                    },
-                  },
+                xaxis: {
+                  categories: pieStats.map(s => s.label),
+                  labels: {
+                    style: {
+                      colors: '#374151'
+                    }
+                  }
                 },
+                yaxis: {
+                  labels: {
+                    style: {
+                      colors: '#374151'
+                    }
+                  }
+                },
+                legend: {
+                  labels: {
+                    colors: '#374151'
+                  }
+                },
+                tooltip: {
+                  theme: 'light'
+                }
               }}
+              series={[
+                {
+                  name: 'Earnings (₱)',
+                  data: pieStats.map(s => s.earnings),
+                  color: '#10b981',
+                  fill: {
+                    type: 'gradient',
+                    gradient: {
+                      shade: 'light',
+                      type: 'vertical',
+                      shadeIntensity: 0.4,
+                      gradientToColors: ['#10b981'],
+                      inverseColors: false,
+                      opacityFrom: 0.4,
+                      opacityTo: 0.1,
+                      stops: [0, 100]
+                    }
+                  }
+                } as any,
+                {
+                  name: 'Rides',
+                  data: pieStats.map(s => s.rides),
+                  color: '#3b82f6',
+                  fill: {
+                    type: 'gradient',
+                    gradient: {
+                      shade: 'light',
+                      type: 'vertical',
+                      shadeIntensity: 0.4,
+                      gradientToColors: ['#3b82f6'],
+                      inverseColors: false,
+                      opacityFrom: 0.4,
+                      opacityTo: 0.1,
+                      stops: [0, 100]
+                    }
+                  }
+                } as any
+              ]}
+              type="line"
+              height={400}
             />
           </div>
         </div>
