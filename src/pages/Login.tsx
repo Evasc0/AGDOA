@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
+import { watchQueue, DriverQueueData } from "../utils/firebaseQueue";
 
 // Use the correct admin email here (case-insensitive check)
 const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
@@ -31,8 +32,16 @@ const Login = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showQueue, setShowQueue] = useState(true); // Default to showing queue
+  const [queue, setQueue] = useState<DriverQueueData[]>([]);
 
   const navigate = useNavigate();
+
+  // Watch the queue in real-time
+  useEffect(() => {
+    const unsubscribe = watchQueue(setQueue);
+    return unsubscribe;
+  }, []);
 
   // Removed auto-redirect to prevent navigation throttling; App.tsx handles routing
 
@@ -233,114 +242,151 @@ const Login = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 text-gray-900 p-4">
+    <div className="flex flex-col min-h-screen bg-gray-100 text-gray-900">
       <Toaster position="top-center" />
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md border border-gray-200">
-        <h1 className="text-2xl font-bold mb-2 text-center text-gray-900">
-          {isSignUp ? "Sign Up" : "Login"}
-        </h1>
-
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-        />
-
-        <div className="relative mb-3">
-        <input
-          type={showPassword ? "text" : "password"}
-          placeholder="Password"
-          className="w-full p-2 bg-gray-200 rounded border border-gray-300 pr-10 text-gray-900"
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            validatePassword(e.target.value);
-          }}
-          autoComplete={isSignUp ? "new-password" : "current-password"}
-        />
+      {/* Login button at the top */}
+      <div className="flex justify-end p-4">
         <button
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-2 top-2 text-sm text-gray-600 hover:text-gray-900"
+          onClick={() => setShowQueue(false)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
           type="button"
-          aria-label={showPassword ? "Hide password" : "Show password"}
         >
-          {showPassword ? "Hide" : "Show"}
+          Login
         </button>
       </div>
-      {passwordError && (
-        <p className="text-red-500 text-sm mb-3">{passwordError}</p>
-      )}
+      {showQueue ? (
+        <div className="flex flex-col items-center justify-start flex-1 p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
+            <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center text-gray-900">
+              Welcome to Agduwa
+            </h1>
+            <h2 className="text-base sm:text-lg font-semibold mb-4 text-center text-gray-700">
+              Active Drivers Queue
+            </h2>
+            {queue.length === 0 ? (
+              <p className="text-center text-gray-600 text-sm sm:text-base">No drivers online at the moment.</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto">
+                <ul className="space-y-2">
+                  {queue.map((driver, index) => (
+                    <li key={index} className="bg-gray-100 p-2 sm:p-3 rounded border">
+                      <p className="font-medium text-sm sm:text-base">{driver.name}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">Plate: {driver.plate}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
+          <h1 className="text-xl sm:text-2xl font-bold mb-2 text-center text-gray-900">
+            {isSignUp ? "Sign Up" : "Login"}
+          </h1>
 
-        {isSignUp && (
-          <>
-            <input
-              type="text"
-              placeholder="Full Name"
-              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-            />
-            <input
-              type="text"
-              placeholder="Plate Number"
-              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
-              value={plate}
-              onChange={(e) => setPlate(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Vehicle"
-              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900"
-              value={vehicle}
-              onChange={(e) => setVehicle(e.target.value)}
-            />
-            <div className="mb-3">
-              <input
-                type="text"
-                placeholder="Phone Number (e.g., 09123456789)"
-                className="flex-1 p-2 bg-gray-200 rounded border border-gray-300 text-gray-900"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  validatePhone(e.target.value);
-                }}
-                autoComplete="tel"
-              />
-              {phoneError && (
-                <p className="text-red-500 text-sm mt-1">{phoneError}</p>
-              )}
-            </div>
-          </>
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+
+          <div className="relative mb-3">
+          <input
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            className="w-full p-2 bg-gray-200 rounded border border-gray-300 pr-10 text-gray-900 text-sm sm:text-base"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              validatePassword(e.target.value);
+            }}
+            autoComplete={isSignUp ? "new-password" : "current-password"}
+          />
+          <button
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-2 top-2 text-xs sm:text-sm text-gray-600 hover:text-gray-900"
+            type="button"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? "Hide" : "Show"}
+          </button>
+        </div>
+        {passwordError && (
+          <p className="text-red-500 text-xs sm:text-sm mb-3">{passwordError}</p>
         )}
 
-        <button
-          onClick={handleAuth}
-          disabled={loading}
-          className={`w-full py-2 px-4 mt-2 rounded font-semibold ${
-            loading
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600"
-          } text-white`}
-          type="button"
-        >
-          {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
-        </button>
+          {isSignUp && (
+            <>
+              <input
+                type="text"
+                placeholder="Full Name"
+                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+              />
+              <input
+                type="text"
+                placeholder="Plate Number"
+                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                value={plate}
+                onChange={(e) => setPlate(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Vehicle"
+                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                value={vehicle}
+                onChange={(e) => setVehicle(e.target.value)}
+              />
+              <div className="mb-3">
+                <input
+                  type="text"
+                  placeholder="Phone Number (e.g., 09123456789)"
+                  className="flex-1 p-2 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    validatePhone(e.target.value);
+                  }}
+                  autoComplete="tel"
+                />
+                {phoneError && (
+                  <p className="text-red-500 text-xs sm:text-sm mt-1">{phoneError}</p>
+                )}
+              </div>
+            </>
+          )}
 
-        <p className="text-sm text-center text-gray-600 mt-4">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-blue-600 hover:underline"
+            onClick={handleAuth}
+            disabled={loading}
+            className={`w-full py-2 px-4 mt-2 rounded font-semibold text-sm sm:text-base ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600"
+            } text-white`}
             type="button"
           >
-            {isSignUp ? "Login here" : "Register"}
+            {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
           </button>
-        </p>
-      </div>
+
+          <p className="text-xs sm:text-sm text-center text-gray-600 mt-4">
+            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-blue-600 hover:underline"
+              type="button"
+            >
+              {isSignUp ? "Login here" : "Register"}
+            </button>
+          </p>
+        </div>
+      )}
     </div>
   );
 };
