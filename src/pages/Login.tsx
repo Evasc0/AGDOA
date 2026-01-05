@@ -17,7 +17,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
-import { query, orderBy } from "firebase/firestore";
+import { query, orderBy, where } from "firebase/firestore";
 
 // Use the correct admin email here (case-insensitive check)
 const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
@@ -49,7 +49,7 @@ const Login = () => {
 
   const navigate = useNavigate();
 
-  // Watch the queue in real-time
+  // Watch the queue in real-time, matching admin page logic
   useEffect(() => {
     const queueQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
     const unsubscribe = onSnapshot(
@@ -70,12 +70,13 @@ const Login = () => {
 
   // Fetch drivers for status display
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "drivers"), (snap) => {
+    const q = query(collection(db, "drivers"), where("verified", "==", true));
+    const unsubscribe = onSnapshot(q, (snap) => {
       const allDrivers = snap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as any[];
-      setDrivers(allDrivers.filter(d => d.verified === true));
+      setDrivers(allDrivers);
     });
     return unsubscribe;
   }, []);
