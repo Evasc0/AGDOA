@@ -303,35 +303,40 @@ const Login = () => {
         </button>
       </div>
       {showQueue ? (
-        <div className="flex flex-col items-center justify-start flex-1 p-4">
-          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
-            <h1 className="text-xl sm:text-2xl font-bold mb-4 text-center text-gray-900">
+        <div className="flex flex-col items-center justify-start flex-1 p-2 sm:p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl border border-gray-200">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-center text-gray-900">
               Welcome to Agduwa
             </h1>
-            <h2 className="text-base sm:text-lg font-semibold mb-4 text-center text-gray-700">
+            <h2 className="text-lg sm:text-xl font-semibold mb-6 text-center text-gray-700">
               Active Drivers Queue
             </h2>
             {queue.length === 0 ? (
-              <p className="text-center text-gray-600 text-sm sm:text-base">No drivers online at the moment.</p>
+              <p className="text-center text-gray-600 text-base sm:text-lg py-8">No drivers online at the moment.</p>
             ) : (
-              <div className="max-h-60 overflow-y-auto">
-                <ul className="space-y-2">
+              <div className="max-h-80 sm:max-h-96 overflow-y-auto">
+                <ul className="space-y-3">
                   {queue.map((entry) => {
                     const driver = drivers.find((d) => d.id === entry.driverId);
                     const status = getDriverStatus(entry.driverId);
 
                     return (
-                      <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200">
-                        <span>
-                          {driver?.name ?? entry.name} ({driver?.plate ?? entry.plate})
-                        </span>
+                      <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center">
+                          <span className="font-medium text-gray-900 text-sm sm:text-base">
+                            {driver?.name ?? entry.name}
+                          </span>
+                          <span className="text-gray-600 text-xs sm:text-sm sm:ml-2">
+                            ({driver?.plate ?? entry.plate}) - {driver?.vehicle ?? 'N/A'}
+                          </span>
+                        </div>
                         <span
-                          className={`text-sm font-medium ${
+                          className={`text-sm sm:text-base font-medium px-2 py-1 rounded-full ${
                             status === "In Queue"
-                              ? "text-green-600"
+                              ? "text-green-700 bg-green-100"
                               : status === "Left the queue (In Ride)"
-                              ? "text-yellow-600"
-                              : "text-red-600"
+                              ? "text-yellow-700 bg-yellow-100"
+                              : "text-red-700 bg-red-100"
                           }`}
                         >
                           {status}
