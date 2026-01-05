@@ -6,6 +6,8 @@ import { useAuth } from "../components/AuthContext";
 import { doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import toast from "react-hot-toast";
+import { goOnline, goOffline } from "../utils/firebaseQueue";
+import { useDriverLocation } from "../hooks/useDriverLocation";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -25,6 +27,8 @@ const Profile = () => {
   const [paymentMethod, setPaymentMethod] = useState("GCash");
   const [paymentNumber, setPaymentNumber] = useState("");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const { coords } = useDriverLocation();
 
   useEffect(() => {
     if (!user) {
@@ -113,8 +117,42 @@ const Profile = () => {
     }
   };
 
-  const toggleStatus = () => {
-    setStatus((prevStatus) => (prevStatus === "Online" ? "Offline" : "Online"));
+  const toggleStatus = async () => {
+    const newStatus = status === "Online" ? "Offline" : "Online";
+    setStatus(newStatus);
+
+    if (!user || !driver) return;
+
+    try {
+      if (newStatus === "Online") {
+        if (!coords) {
+          toast.error("Location not available. Please enable GPS.");
+          setStatus("Offline");
+          return;
+        }
+        await goOnline(user.uid, {
+          name: driver.name,
+          plate: driver.plate,
+          onlineAt: Date.now(),
+          lat: coords.latitude,
+          lng: coords.longitude,
+          status: "online",
+        });
+        toast.success("You are now online!");
+      } else {
+        await goOffline(user.uid);
+        toast.success("You are now offline.");
+      }
+
+      // Update status in drivers collection
+      const driverRef = doc(db, "drivers", user.uid);
+      await setDoc(driverRef, { status: newStatus.toLowerCase() }, { merge: true });
+
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast.error("Failed to update status. Please try again.");
+      setStatus(status); // Revert on error
+    }
   };
 
   if (!driver) return null;

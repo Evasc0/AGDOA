@@ -12,13 +12,24 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  collection,
+  onSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
-import { watchQueue, DriverQueueData } from "../utils/firebaseQueue";
+import { query, orderBy } from "firebase/firestore";
 
 // Use the correct admin email here (case-insensitive check)
 const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
+
+interface QueueEntry {
+  driverId: string;
+  name: string;
+  plate: string;
+  joinedAt?: any;
+  order?: number;
+  id?: string;
+}
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -33,13 +44,39 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showQueue, setShowQueue] = useState(true); // Default to showing queue
-  const [queue, setQueue] = useState<DriverQueueData[]>([]);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
 
   const navigate = useNavigate();
 
   // Watch the queue in real-time
   useEffect(() => {
-    const unsubscribe = watchQueue(setQueue);
+    const queueQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
+    const unsubscribe = onSnapshot(
+      queueQuery,
+      (snap) => {
+        const currentQueue = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as QueueEntry[];
+        setQueue(currentQueue);
+      },
+      (error) => {
+        console.error("Error fetching queue:", error);
+      }
+    );
+    return unsubscribe;
+  }, []);
+
+  // Fetch drivers for status display
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "drivers"), (snap) => {
+      const allDrivers = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as any[];
+      setDrivers(allDrivers.filter(d => d.verified === true));
+    });
     return unsubscribe;
   }, []);
 
@@ -64,6 +101,16 @@ const Login = () => {
       setPhoneError("");
       return true;
     }
+  };
+
+  // Helper: Determine driver status string for display with new text
+  const getDriverStatus = (driverId: string) => {
+    const driver = drivers.find((d) => d.id === driverId);
+    if (!driver) return "Offline";
+    if (driver.status === "waiting") return "In Queue";
+    if (driver.status === "in ride") return "Left the queue (In Ride)";
+    if (driver.status === "offline") return "Offline";
+    return "Offline";
   };
 
   const handleAuth = async () => {
@@ -268,123 +315,151 @@ const Login = () => {
             ) : (
               <div className="max-h-60 overflow-y-auto">
                 <ul className="space-y-2">
-                  {queue.map((driver, index) => (
-                    <li key={index} className="bg-gray-100 p-2 sm:p-3 rounded border">
-                      <p className="font-medium text-sm sm:text-base">{driver.name}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Plate: {driver.plate}</p>
-                    </li>
-                  ))}
+                  {queue.map((entry) => {
+                    const driver = drivers.find((d) => d.id === entry.driverId);
+                    const status = getDriverStatus(entry.driverId);
+
+                    return (
+                      <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-200">
+                        <span>
+                          {driver?.name ?? entry.name} ({driver?.plate ?? entry.plate})
+                        </span>
+                        <span
+                          className={`text-sm font-medium ${
+                            status === "In Queue"
+                              ? "text-green-600"
+                              : status === "Left the queue (In Ride)"
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {status}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
-          <h1 className="text-xl sm:text-2xl font-bold mb-2 text-center text-gray-900">
-            {isSignUp ? "Sign Up" : "Login"}
-          </h1>
+        <div className="flex flex-col items-center justify-center flex-1 p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
+            <div className="flex justify-start mb-4">
+              <button
+                onClick={() => setShowQueue(true)}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
+                type="button"
+              >
+                ← Back
+              </button>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold mb-2 text-center text-gray-900">
+              {isSignUp ? "Sign Up" : "Login"}
+            </h1>
 
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
+            <input
+              type="email"
+              placeholder="Email"
+              className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
 
-          <div className="relative mb-3">
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Password"
-            className="w-full p-2 bg-gray-200 rounded border border-gray-300 pr-10 text-gray-900 text-sm sm:text-base"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              validatePassword(e.target.value);
-            }}
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-          />
-          <button
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2 top-2 text-xs sm:text-sm text-gray-600 hover:text-gray-900"
-            type="button"
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
-        </div>
-        {passwordError && (
-          <p className="text-red-500 text-xs sm:text-sm mb-3">{passwordError}</p>
-        )}
-
-          {isSignUp && (
-            <>
-              <input
-                type="text"
-                placeholder="Full Name"
-                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="name"
-              />
-              <input
-                type="text"
-                placeholder="Plate Number"
-                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
-                value={plate}
-                onChange={(e) => setPlate(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Vehicle"
-                className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
-                value={vehicle}
-                onChange={(e) => setVehicle(e.target.value)}
-              />
-              <div className="mb-3">
-                <input
-                  type="text"
-                  placeholder="Phone Number (e.g., 09123456789)"
-                  className="flex-1 p-2 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    validatePhone(e.target.value);
-                  }}
-                  autoComplete="tel"
-                />
-                {phoneError && (
-                  <p className="text-red-500 text-xs sm:text-sm mt-1">{phoneError}</p>
-                )}
-              </div>
-            </>
+            <div className="relative mb-3">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="w-full p-2 bg-gray-200 rounded border border-gray-300 pr-10 text-gray-900 text-sm sm:text-base"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                validatePassword(e.target.value);
+              }}
+              autoComplete={isSignUp ? "new-password" : "current-password"}
+            />
+            <button
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-2 text-xs sm:text-sm text-gray-600 hover:text-gray-900"
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          {passwordError && (
+            <p className="text-red-500 text-xs sm:text-sm mb-3">{passwordError}</p>
           )}
 
-          <button
-            onClick={handleAuth}
-            disabled={loading}
-            className={`w-full py-2 px-4 mt-2 rounded font-semibold text-sm sm:text-base ${
-              loading
-                ? "bg-blue-400 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
-            } text-white`}
-            type="button"
-          >
-            {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
-          </button>
+            {isSignUp && (
+              <>
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoComplete="name"
+                />
+                <input
+                  type="text"
+                  placeholder="Plate Number"
+                  className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Vehicle"
+                  className="w-full p-2 mb-3 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                  value={vehicle}
+                  onChange={(e) => setVehicle(e.target.value)}
+                />
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    placeholder="Phone Number (e.g., 09123456789)"
+                    className="flex-1 p-2 bg-gray-200 rounded border border-gray-300 text-gray-900 text-sm sm:text-base"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      validatePhone(e.target.value);
+                    }}
+                    autoComplete="tel"
+                  />
+                  {phoneError && (
+                    <p className="text-red-500 text-xs sm:text-sm mt-1">{phoneError}</p>
+                  )}
+                </div>
+              </>
+            )}
 
-          <p className="text-xs sm:text-sm text-center text-gray-600 mt-4">
-            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
             <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-blue-600 hover:underline"
+              onClick={handleAuth}
+              disabled={loading}
+              className={`w-full py-2 px-4 mt-2 rounded font-semibold text-sm sm:text-base ${
+                loading
+                  ? "bg-blue-400 cursor-not-allowed"
+                  : "bg-blue-500 hover:bg-blue-600"
+              } text-white`}
               type="button"
             >
-              {isSignUp ? "Login here" : "Register"}
+              {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
             </button>
-          </p>
+
+            <p className="text-xs sm:text-sm text-center text-gray-600 mt-4">
+              {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+              <button
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-blue-600 hover:underline"
+                type="button"
+              >
+                {isSignUp ? "Login here" : "Register"}
+              </button>
+            </p>
+          </div>
         </div>
       )}
     </div>
