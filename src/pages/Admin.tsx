@@ -1245,7 +1245,7 @@ className={`px-4 py-2 rounded ${
                         },
                       },
                       legend: {
-                        position: 'top',
+                        display: false,
                       },
                       tooltip: {
                         callbacks: {
