@@ -290,13 +290,13 @@ const Login = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100 text-gray-900">
+    <div className="flex flex-col min-h-screen text-gray-900" style={{ backgroundImage: 'url(/img/logo1.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <Toaster position="top-center" />
       {/* Login button at the top */}
       <div className="flex justify-end p-4">
         <button
           onClick={() => setShowQueue(false)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
+          className="bg-cyan-500 hover:bg-cyan-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
           type="button"
         >
           Login
@@ -304,15 +304,15 @@ const Login = () => {
       </div>
       {showQueue ? (
         <div className="flex flex-col items-center justify-start flex-1 p-2 sm:p-4">
-          <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl border border-gray-200">
-            <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-center text-gray-900">
+          <div className="animated-gradient p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-center text-green-200">
               Welcome to Agduwa
             </h1>
-            <h2 className="text-lg sm:text-xl font-semibold mb-6 text-center text-gray-700">
+            <h2 className="text-lg sm:text-xl font-semibold mb-6 text-center text-green-100">
               Active Drivers Queue
             </h2>
             {queue.length === 0 ? (
-              <p className="text-center text-gray-600 text-base sm:text-lg py-8">No drivers online at the moment.</p>
+              <p className="text-center text-white text-base sm:text-lg py-8">No drivers online at the moment.</p>
             ) : (
               <div className="max-h-80 sm:max-h-96 overflow-y-auto">
                 <ul className="space-y-3">
@@ -351,17 +351,17 @@ const Login = () => {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 p-4">
-          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200">
+          <div className="p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg border border-gray-200" style={{ backgroundImage: 'url(/img/logo1.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
             <div className="flex justify-start mb-4">
               <button
                 onClick={() => setShowQueue(true)}
-                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
+                className="bg-cyan-500 hover:bg-red-500 text-white px-3 py-2 sm:px-4 sm:py-2 rounded font-semibold text-sm sm:text-base"
                 type="button"
               >
                 ← Back
               </button>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold mb-2 text-center text-gray-900">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2 text-center text-white">
               {isSignUp ? "Sign Up" : "Login"}
             </h1>
 
@@ -455,11 +455,11 @@ const Login = () => {
               {loading ? "Processing..." : isSignUp ? "Create Account" : "Login"}
             </button>
 
-            <p className="text-xs sm:text-sm text-center text-gray-600 mt-4">
+            <p className="text-xs sm:text-sm text-center text-white mt-4">
               {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
               <button
                 onClick={() => setIsSignUp(!isSignUp)}
-                className="text-blue-600 hover:underline"
+                className="text-cyan-200 hover:underline"
                 type="button"
               >
                 {isSignUp ? "Login here" : "Register"}
