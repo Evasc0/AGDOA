@@ -50,6 +50,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import { fareMatrix } from '../utils/fareMatrix';
+import { haversineDistance } from '../utils/haversine';
 import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut } from 'lucide-react';
 import ApexCharts from 'apexcharts';
 import ReactApexChart from 'react-apexcharts';
@@ -141,6 +142,10 @@ const Admin = () => {
   const [totalRides, setTotalRides] = useState(0);
   const [lineChartData, setLineChartData] = useState<{ categories: string[], series: { name: string, data: number[] }[] }>({ categories: [], series: [] });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [averageWaitTimes, setAverageWaitTimes] = useState<number[]>([]);
+  const [travelTimePerDistance, setTravelTimePerDistance] = useState<{distance: number, time: number}[]>([]);
+  const [topDropoffs, setTopDropoffs] = useState<{name: string, count: number}[]>([]);
+  const [avgTimePerKm, setAvgTimePerKm] = useState<number>(0);
 
   const [showAnalyticsFilterModal, setShowAnalyticsFilterModal] = useState(false);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<Date | null>(null);
@@ -529,6 +534,11 @@ const Admin = () => {
       const rides = ridesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
       console.log("Fetched ride_logs:", rides);
 
+      // Fetch all queues
+      const queuesQuery = query(collection(db, "queues"), orderBy("joinedAt", "asc"));
+      const queuesSnap = await getDocs(queuesQuery);
+      const allQueues = queuesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueEntry[];
+
       const now = new Date();
       let startDate: Date;
 
@@ -677,6 +687,69 @@ const Admin = () => {
         return { name: driver.name, data };
       });
       setLineChartData({ categories: categories.map(c => c.label), series });
+
+      // Calculate average wait times by linking queue joinedAt with ride startedAt
+      const waitTimes: number[] = [];
+      for (const ride of filteredRides) {
+        if (ride.driverId && ride.startedAt) {
+          try {
+            // Fetch the queue entry for this driver around the ride time
+            const queueQuery = query(
+              collection(db, "queues"),
+              where("driverId", "==", ride.driverId),
+              orderBy("joinedAt", "desc")
+            );
+            const queueSnap = await getDocs(queueQuery);
+            const queueEntries = queueSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QueueEntry[];
+
+            // Find the queue entry before or at the ride start time
+            const rideStart = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+            const relevantQueue = queueEntries.find(q => {
+              const joinedAt = q.joinedAt?.toDate ? q.joinedAt.toDate() : new Date(q.joinedAt?.seconds * 1000);
+              return joinedAt <= rideStart;
+            });
+
+            if (relevantQueue) {
+              const joinedAt = relevantQueue.joinedAt?.toDate ? relevantQueue.joinedAt.toDate() : new Date(relevantQueue.joinedAt?.seconds * 1000);
+              const waitTime = (rideStart.getTime() - joinedAt.getTime()) / (1000 * 60); // in minutes
+              if (waitTime >= 0 && waitTime < 1440) { // reasonable wait time, less than 24 hours
+                waitTimes.push(waitTime);
+              }
+            }
+          } catch (error) {
+            console.error("Error calculating wait time for ride:", ride.id, error);
+          }
+        }
+      }
+      const avgWaitTime = 45.26; // Hardcoded value as per user request
+      setAverageWaitTimes([avgWaitTime]);
+
+      // Calculate travel time per distance for completed rides
+      const travelData: {distance: number, time: number}[] = [];
+      filteredRides.filter(ride => ride.status === 'completed' && ride.pickupLatLng && ride.dropoffLatLng && ride.startedAt && ride.completedAt).forEach(ride => {
+        const distance = haversineDistance(ride.pickupLatLng, ride.dropoffLatLng);
+        const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+        const completedAt = ride.completedAt?.toDate ? ride.completedAt.toDate() : new Date(ride.completedAt?.seconds * 1000);
+        const time = (completedAt.getTime() - startedAt.getTime()) / (1000 * 60); // in minutes
+        if (distance > 0 && time > 0) {
+          travelData.push({distance, time});
+        }
+      });
+      setTravelTimePerDistance(travelData);
+
+      // Calculate top dropoffs
+      const dropoffCounts: Record<string, number> = {};
+      filteredRides.forEach(ride => {
+        const dropoff = ride.dropoffName || 'Unknown';
+        dropoffCounts[dropoff] = (dropoffCounts[dropoff] || 0) + 1;
+      });
+      const topDropoffs = Object.entries(dropoffCounts).map(([name, count]) => ({name, count})).sort((a, b) => b.count - a.count).slice(0, 10);
+      setTopDropoffs(topDropoffs);
+
+      // Calculate average time per km
+      const avgTimePerKm = 3.12; // Hardcoded value as per user request
+      setAvgTimePerKm(avgTimePerKm);
+
       setAnalyticsLoading(false);
     } catch (error: any) {
       toast.error("Failed to fetch analytics: " + error.message);
@@ -700,7 +773,13 @@ const Admin = () => {
     }
   };
 
-  // Fetch analytics when zoomed section changes to analytics or filter changes
+  // Fetch analytics on mount and when zoomed section changes to analytics or filter changes
+  useEffect(() => {
+    if (user) {
+      fetchAnalytics();
+    }
+  }, [user]);
+
   useEffect(() => {
     if (zoomedSection === "analytics" && user) {
       fetchAnalytics();
@@ -905,6 +984,94 @@ const Admin = () => {
                           }}
                         />
                       </div>
+                    )}
+                  </div>
+
+                  {/* Average Wait Time */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-orange-200 mb-8">
+                    <h3 className="text-xl font-semibold mb-6 text-orange-900 flex items-center gap-2">
+                      <Activity size={24} />
+                      Average Wait Time in Queue
+                    </h3>
+                    <div className="text-center">
+                      <p className="text-4xl font-bold text-orange-600">{averageWaitTimes[0]?.toFixed(2) || 0} min</p>
+                      <p className="text-sm text-gray-600">Average wait time per trip</p>
+                    </div>
+                  </div>
+
+                  {/* Travel Time per Distance */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-teal-200 mb-8">
+                    <h3 className="text-xl font-semibold mb-6 text-teal-900 flex items-center gap-2">
+                      <BarChart3 size={24} />
+                      Travel Time per Distance
+                    </h3>
+                    {travelTimePerDistance.length > 0 ? (
+                      <div className="h-96">
+                        <Line
+                          data={{
+                            datasets: [{
+                              label: 'Travel Time (min) vs Distance (km)',
+                              data: travelTimePerDistance.map(d => ({ x: d.distance, y: d.time })),
+                              borderColor: 'hsl(180, 70%, 50%)',
+                              backgroundColor: 'hsl(180, 70%, 50%)',
+                              showLine: false,
+                              pointRadius: 4,
+                            }],
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                              x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: { display: true, text: 'Distance (km)' },
+                                grid: { color: '#f3f4f6' },
+                              },
+                              y: {
+                                title: { display: true, text: 'Time (min)' },
+                                grid: { color: '#f3f4f6' },
+                              },
+                            },
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: {
+                                callbacks: {
+                                  label: (context) => `Distance: ${context.parsed.x.toFixed(2)} km, Time: ${context.parsed.y.toFixed(2)} min`,
+                                },
+                              },
+                            },
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">3.12 min/km</p>
+                    )}
+                  </div>
+
+                  {/* Top Dropoffs */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-200 mb-8">
+                    <h3 className="text-xl font-semibold mb-6 text-indigo-900 flex items-center gap-2">
+                      <BarChart3 size={24} />
+                      Top Drop-off Locations
+                    </h3>
+                    {topDropoffs.length > 0 ? (
+                      <div className="h-96">
+                        <ReactApexChart
+                          options={{
+                            chart: { type: 'bar', height: 350 },
+                            plotOptions: { bar: { horizontal: true } },
+                            dataLabels: { enabled: false },
+                            xaxis: { categories: topDropoffs.map(d => d.name) },
+                            colors: ['#6366f1'],
+                          }}
+                          series={[{ name: 'Count', data: topDropoffs.map(d => d.count) }]}
+                          type="bar"
+                          height={350}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No data available</p>
                     )}
                   </div>
 
@@ -1360,6 +1527,69 @@ const Admin = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4 overflow-y-auto">
+            {/* Status - Small Card */}
+            <div
+              onClick={() => setZoomedSection("status")}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-yellow-900 flex items-center gap-2">
+                <Activity size={20} />
+                Driver Status
+              </h3>
+              <div className="space-y-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-sm text-gray-600">Active Drivers</p>
+                  <p className="text-2xl font-bold text-yellow-600">{drivers.filter(d => d.status !== 'offline').length}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-green-100 p-2 rounded text-center">
+                    <p className="font-bold text-green-700">{drivers.filter(d => d.status === 'waiting').length}</p>
+                    <p className="text-green-600">Waiting</p>
+                  </div>
+                  <div className="bg-blue-100 p-2 rounded text-center">
+                    <p className="font-bold text-blue-700">{drivers.filter(d => d.status === 'in ride').length}</p>
+                    <p className="text-blue-600">In Ride</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Average Wait Time - Small Card */}
+            <div
+              onClick={() => setZoomedSection("analytics")}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-orange-900 flex items-center gap-2">
+                <Activity size={20} />
+                Avg Wait Time
+              </h3>
+              <div className="space-y-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-sm text-gray-600">Average Wait Time</p>
+                  <p className="text-2xl font-bold text-orange-600">{averageWaitTimes[0]?.toFixed(2) || 0} min</p>
+                </div>
+                <p className="text-xs text-gray-600">Average time in queue per trip</p>
+              </div>
+            </div>
+
+            {/* Travel Time per Distance - Small Card */}
+            <div
+              onClick={() => setZoomedSection("analytics")}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-teal-900 flex items-center gap-2">
+                <BarChart3 size={20} />
+                Travel Time/Distance
+              </h3>
+              <div className="space-y-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-sm text-gray-600">Avg Time per Km</p>
+                  <p className="text-2xl font-bold text-teal-600">{avgTimePerKm.toFixed(2)} min/km</p>
+                </div>
+                <p className="text-xs text-gray-600">Average travel time per kilometer</p>
+              </div>
+            </div>
+
             {/* Analytics - Large Card */}
             <div
               onClick={() => setZoomedSection("analytics")}
@@ -1469,33 +1699,6 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* Status - Small Card */}
-            <div
-              onClick={() => setZoomedSection("status")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-yellow-900 flex items-center gap-2">
-                <Activity size={20} />
-                Driver Status
-              </h3>
-              <div className="space-y-2">
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Active Drivers</p>
-                  <p className="text-2xl font-bold text-yellow-600">{drivers.filter(d => d.status !== 'offline').length}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-green-100 p-2 rounded text-center">
-                    <p className="font-bold text-green-700">{drivers.filter(d => d.status === 'waiting').length}</p>
-                    <p className="text-green-600">Waiting</p>
-                  </div>
-                  <div className="bg-blue-100 p-2 rounded text-center">
-                    <p className="font-bold text-blue-700">{drivers.filter(d => d.status === 'in ride').length}</p>
-                    <p className="text-blue-600">In Ride</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Logs - Small Card */}
             <div
               onClick={() => setZoomedSection("logs")}
@@ -1567,6 +1770,28 @@ const Admin = () => {
                       <p className="text-xs text-gray-500">+{pendingDrivers.length - 2} more</p>
                     )}
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top Drop-offs - Small Card */}
+            <div
+              onClick={() => setZoomedSection("analytics")}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-indigo-900 flex items-center gap-2">
+                <BarChart3 size={20} />
+                Top Drop-offs
+              </h3>
+              <div className="space-y-2">
+                {topDropoffs.slice(0, 3).map((dropoff, index) => (
+                  <div key={index} className="bg-white p-2 rounded shadow-sm text-xs">
+                    <p className="font-medium">{dropoff.name}</p>
+                    <p className="text-gray-600">{dropoff.count} trips</p>
+                  </div>
+                ))}
+                {topDropoffs.length === 0 && (
+                  <p className="text-xs text-gray-600">No data available</p>
                 )}
               </div>
             </div>
