@@ -119,6 +119,76 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
 
+// Helper function to bucket rides by date and hour
+const bucketRidesByHour = (rides: any[], filter: 'weekly' | 'monthly' | 'annually' | 'custom', startDate?: Date, endDate?: Date) => {
+  const now = new Date();
+  const buckets: Record<string, Record<number, number>> = {};
+
+  // Define hours: 6 AM to 7 PM (13 hours)
+  const hours = Array.from({ length: 13 }, (_, i) => 6 + i);
+
+  // Define dates based on filter
+  let dates: string[] = [];
+  if (filter === 'weekly') {
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+  } else if (filter === 'monthly') {
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+  } else if (filter === 'annually') {
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now);
+      date.setMonth(now.getMonth() - i);
+      dates.push(date.toISOString().slice(0, 7)); // YYYY-MM
+    }
+  } else if (filter === 'custom' && startDate && endDate) {
+    // For custom filter, generate all dates between start and end
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      dates.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  }
+
+  // Initialize buckets
+  dates.forEach(date => {
+    buckets[date] = {};
+    hours.forEach(hour => {
+      buckets[date][hour] = 0;
+    });
+  });
+
+  // Bucket rides
+  rides.forEach(ride => {
+    const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+    let dateKey: string;
+    if (filter === 'annually') {
+      dateKey = rideDate.toISOString().slice(0, 7);
+    } else {
+      dateKey = rideDate.toISOString().split('T')[0];
+    }
+
+    if (buckets[dateKey]) {
+      const hour = rideDate.getHours();
+      if (hour >= 6 && hour <= 18 && buckets[dateKey][hour] !== undefined) {
+        buckets[dateKey][hour]++;
+      }
+    }
+  });
+
+  // Convert to 2D array
+  const data = dates.map(date => hours.map(hour => buckets[date][hour]));
+  const hourLabels = hours.map(h => `${h}:00`);
+
+  return { dates, hours: hourLabels, data };
+};
+
 const Admin = () => {
   const db = getFirestore();
   const auth = getAuth();
@@ -141,6 +211,7 @@ const Admin = () => {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalRides, setTotalRides] = useState(0);
   const [lineChartData, setLineChartData] = useState<{ categories: string[], series: { name: string, data: number[] }[] }>({ categories: [], series: [] });
+  const [heatmapData, setHeatmapData] = useState<{ dates: string[], hours: string[], data: number[][] }>({ dates: [], hours: [], data: [] });
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [averageWaitTimes, setAverageWaitTimes] = useState<number[]>([]);
   const [travelTimePerDistance, setTravelTimePerDistance] = useState<{distance: number, time: number}[]>([]);
@@ -159,6 +230,12 @@ const Admin = () => {
   const [pieColors, setPieColors] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768); // Open by default on md+ screens
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // History filters
+  const [historySearchName, setHistorySearchName] = useState("");
+  const [historySearchPlate, setHistorySearchPlate] = useState("");
+  const [historyStartDate, setHistoryStartDate] = useState<Date | null>(null);
+  const [historyEndDate, setHistoryEndDate] = useState<Date | null>(null);
 
   // Update isMobile on window resize
   useEffect(() => {
@@ -688,6 +765,10 @@ const Admin = () => {
       });
       setLineChartData({ categories: categories.map(c => c.label), series });
 
+      // Calculate heatmap data for ride volume
+      const heatmapData = bucketRidesByHour(filteredRides, analyticsFilter, analyticsStartDate || undefined, analyticsEndDate || undefined);
+      setHeatmapData(heatmapData);
+
       // Calculate average wait times by linking queue joinedAt with ride startedAt
       const waitTimes: number[] = [];
       for (const ride of filteredRides) {
@@ -915,139 +996,172 @@ const Admin = () => {
                     </button>
                   </div>
 
-                  {/* Overall Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-200">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <BarChart3 size={24} className="text-blue-600" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-blue-900">Total Rides</h3>
-                      </div>
-                      <p className="text-4xl font-bold text-blue-600">{totalRides}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-xl shadow-lg border border-green-200">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                          <Activity size={24} className="text-green-600" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-green-900">Total Earnings</h3>
-                      </div>
-                      <p className="text-4xl font-bold text-green-600">₱{totalEarnings}</p>
-                    </div>
-                  </div>
-
-                  {/* Earnings Chart */}
+                  {/* Ride Volume Heatmap Report */}
                   <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-200 mb-8">
-                    {lineChartData.categories.length > 0 && (
-                      <div className="h-96">
-                        <Line
-                          data={{
-                            labels: lineChartData.categories,
-                            datasets: lineChartData.series.map((s, index) => ({
-                              label: s.name,
-                              data: s.data,
-                              borderColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
-                              backgroundColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
-                              tension: 0.1,
-                              fill: false,
-                            })),
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                              y: {
-                                beginAtZero: true,
-                                grid: { color: '#f3f4f6' },
-                              },
-                              x: {
-                                grid: { color: '#f3f4f6' },
-                              },
-                            },
-                            plugins: {
-                              zoom: {
-                                zoom: {
-                                  wheel: { enabled: true },
-                                  pinch: { enabled: true },
-                                  mode: 'x',
-                                },
-                                pan: { enabled: true, mode: 'x' },
-                              },
-                              legend: { display: false },
-                              tooltip: {
-                                callbacks: {
-                                  label: (context) => `${context.dataset.label}: ₱${context.parsed.y}`,
-                                },
-                              },
-                            },
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Average Wait Time */}
-                  <div className="bg-white p-6 rounded-xl shadow-lg border border-orange-200 mb-8">
-                    <h3 className="text-xl font-semibold mb-6 text-orange-900 flex items-center gap-2">
-                      <Activity size={24} />
-                      Average Wait Time in Queue
-                    </h3>
-                    <div className="text-center">
-                      <p className="text-4xl font-bold text-orange-600">{averageWaitTimes[0]?.toFixed(2) || 0} min</p>
-                      <p className="text-sm text-gray-600">Average wait time per trip</p>
-                    </div>
-                  </div>
-
-                  {/* Travel Time per Distance */}
-                  <div className="bg-white p-6 rounded-xl shadow-lg border border-teal-200 mb-8">
-                    <h3 className="text-xl font-semibold mb-6 text-teal-900 flex items-center gap-2">
+                    <h3 className="text-xl font-semibold mb-6 text-blue-900 flex items-center gap-2">
                       <BarChart3 size={24} />
-                      Travel Time per Distance
+                      Ride Volume Report
                     </h3>
-                    {travelTimePerDistance.length > 0 ? (
-                      <div className="h-96">
-                        <Line
-                          data={{
-                            datasets: [{
-                              label: 'Travel Time (min) vs Distance (km)',
-                              data: travelTimePerDistance.map(d => ({ x: d.distance, y: d.time })),
-                              borderColor: 'hsl(180, 70%, 50%)',
-                              backgroundColor: 'hsl(180, 70%, 50%)',
-                              showLine: false,
-                              pointRadius: 4,
-                            }],
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                              x: {
-                                type: 'linear',
-                                position: 'bottom',
-                                title: { display: true, text: 'Distance (km)' },
-                                grid: { color: '#f3f4f6' },
-                              },
-                              y: {
-                                title: { display: true, text: 'Time (min)' },
-                                grid: { color: '#f3f4f6' },
-                              },
-                            },
-                            plugins: {
-                              legend: { display: false },
-                              tooltip: {
-                                callbacks: {
-                                  label: (context) => `Distance: ${context.parsed.x.toFixed(2)} km, Time: ${context.parsed.y.toFixed(2)} min`,
-                                },
-                              },
-                            },
-                          }}
-                        />
+                    {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* Total Rides */}
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-blue-600 mb-2">
+                            {heatmapData.data.flat().reduce((sum, val) => sum + val, 0)}
+                          </div>
+                          <p className="text-sm text-gray-600">Total Rides</p>
+                        </div>
+
+                        {/* Peak Hour */}
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-green-600 mb-2">
+                            {(() => {
+                              const hourTotals = heatmapData.hours.map((_, hourIndex) =>
+                                heatmapData.data.reduce((sum, dayData) => sum + dayData[hourIndex], 0)
+                              );
+                              const maxIndex = hourTotals.indexOf(Math.max(...hourTotals));
+                              return heatmapData.hours[maxIndex];
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600">Peak Hour</p>
+                        </div>
+
+                        {/* Busiest Day */}
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-orange-600 mb-2">
+                            {(() => {
+                              const dayTotals = heatmapData.data.map(dayData =>
+                                dayData.reduce((sum, val) => sum + val, 0)
+                              );
+                              const maxIndex = dayTotals.indexOf(Math.max(...dayTotals));
+                              const date = heatmapData.dates[maxIndex];
+                              if (analyticsFilter === 'annually') {
+                                return new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                              } else if (analyticsFilter === 'weekly') {
+                                return new Date(date).toLocaleString('en-US', { weekday: 'short' });
+                              } else {
+                                return new Date(date).getDate().toString();
+                              }
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600">Busiest Day</p>
+                        </div>
+
+                        {/* Average per Hour */}
+                        <div className="text-center">
+                          <div className="text-3xl font-bold text-purple-600 mb-2">
+                            {(() => {
+                              const total = heatmapData.data.flat().reduce((sum, val) => sum + val, 0);
+                              const avg = total / (heatmapData.dates.length * heatmapData.hours.length);
+                              return avg.toFixed(1);
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600">Avg Rides/Hour</p>
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-gray-500">3.12 min/km</p>
                     )}
                   </div>
+
+                  {/* Ride Volume Heatmap */}
+                  <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-200 mb-8">
+                    <h3 className="text-xl font-semibold mb-6 text-blue-900 flex items-center gap-2">
+                      <BarChart3 size={24} />
+                      Ride Volume Heatmap
+                    </h3>
+                    {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
+                      <div className="overflow-x-auto">
+                        <div className="inline-block min-w-full">
+                          {/* Header row with dates */}
+                          <div className="flex">
+                            <div className="w-16 flex-shrink-0"></div>
+                            {heatmapData.dates.map((date, index) => {
+                              let displayText = '';
+                              if (analyticsFilter === 'annually') {
+                                displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                              } else if (analyticsFilter === 'weekly') {
+                                displayText = new Date(date).toLocaleString('en-US', { weekday: 'short' });
+                              } else {
+                                displayText = new Date(date).getDate().toString();
+                              }
+                              return (
+                                <div key={index} className="flex-1 min-w-12 text-center text-xs font-medium text-gray-600 p-2">
+                                  {displayText}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* Data rows */}
+                          {heatmapData.hours.map((hour, hourIndex) => {
+                            return (
+                              <div key={hourIndex} className="flex">
+                                {/* Hour label */}
+                                <div className="w-16 flex-shrink-0 text-xs font-medium text-gray-600 p-2 flex items-center justify-end">
+                                  {hour}
+                                </div>
+                                {/* Cells */}
+                                {heatmapData.dates.map((date, dateIndex) => {
+                                  const value = heatmapData.data[dateIndex][hourIndex];
+                                  let bgColor = 'bg-gray-100'; // Default white for 0 rides
+
+                                  if (value >= 1 && value <= 5) {
+                                    bgColor = 'bg-blue-200'; // Light blue for 1-3 rides
+                                  } else if (value >= 6 && value <= 10) {
+                                    bgColor = 'bg-blue-400'; // Medium blue for 4-7 rides
+                                  } else if (value >= 11 && value <= 15) {
+                                    bgColor = 'bg-orange-400'; // Orange for 8-10 rides
+                                  } else if (value > 16) {
+                                    bgColor = 'bg-red-500'; // Red for 10+ rides
+                                  }
+
+                                  return (
+                                    <div
+                                      key={dateIndex}
+                                      className={`flex-1 min-w-12 h-8 ${bgColor} border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity relative group`}
+                                      title={`${date} ${hour}: ${value} rides`}
+                                    >
+                                      {/* Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                        Date: {(() => {
+                                          if (analyticsFilter === 'annually') {
+                                            return new Date(date + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                                          } else if (analyticsFilter === 'weekly') {
+                                            return new Date(date).toLocaleString('en-US', { weekday: 'long' });
+                                          } else {
+                                            return new Date(date).toLocaleDateString();
+                                          }
+                                        })()}
+                                        <br />
+                                        Hour: {hour}
+                                        <br />
+                                        Rides: {value}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Legend */}
+                        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-600">
+                          <span>0</span>
+                          <div className="flex gap-1">
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => {
+                              let bgColor = 'bg-gray-100';
+                              if (i >= 1 && i <= 3) bgColor = 'bg-blue-200';
+                              else if (i >= 4 && i <= 7) bgColor = 'bg-blue-400';
+                              else if (i >= 8 && i <= 10) bgColor = 'bg-orange-400';
+                              else if (i > 10) bgColor = 'bg-red-500';
+                              return <div key={i} className={`w-4 h-4 ${bgColor} border border-gray-300`}></div>;
+                            })}
+                          </div>
+                          <span>10+</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+
 
                   {/* Top Dropoffs */}
                   <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-200 mb-8">
@@ -1075,43 +1189,7 @@ const Admin = () => {
                     )}
                   </div>
 
-                  {/* Driver Performance */}
-                  <div className="bg-white p-6 rounded-xl shadow-lg border border-purple-200">
-                    <h3 className="text-xl font-semibold mb-6 text-purple-900 flex items-center gap-2">
-                      <Users size={24} />
-                      Driver Performance
-                    </h3>
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {[...drivers].sort((a, b) => {
-                        const aEarnings = driverPieStats[a.id]?.[1]?.earnings || 0;
-                        const bEarnings = driverPieStats[b.id]?.[1]?.earnings || 0;
-                        return bEarnings - aEarnings;
-                      }).map((driver, index, sortedDrivers) => {
-                        const driverStats = driverPieStats[driver.id];
-                        if (!driverStats || driverStats.length === 0) return null;
 
-                        const hue = sortedDrivers.length > 1 ? 120 - (index / (sortedDrivers.length - 1)) * 120 : 120;
-
-                        return (
-                          <div
-                            key={driver.id}
-                            className="p-4 rounded-lg shadow-md"
-                            style={{ backgroundColor: `hsl(${hue}, 70%, 50%)` }}
-                          >
-                            <h4 className="font-semibold mb-3 text-white text-lg">{driver.name} ({driver.plate})</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div className="bg-white/20 p-3 rounded-lg">
-                                <span className="text-white font-medium">Rides: {driverStats[0]?.rides || 0}</span>
-                              </div>
-                              <div className="bg-white/20 p-3 rounded-lg">
-                                <span className="text-white font-medium">Earnings: ₱{driverStats[1]?.earnings || 0}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -1414,36 +1492,107 @@ const Admin = () => {
                 {showDestinationHistory && (
                   <div className="mt-4">
                     <h3 className="text-md font-semibold mb-2 text-gray-900">Destination History (Chronological)</h3>
-                    {destinationHistory.length === 0 ? (
-                      <p className="text-gray-500">No rides found.</p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm bg-white rounded overflow-hidden border border-gray-300">
-                          <thead>
-                            <tr className="bg-gray-50 text-left">
-                              <th className="p-2">Driver Name</th>
-                              <th>Plate Number</th>
-                              <th>Destination</th>
-                              <th>Date and Time</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {destinationHistory.map((ride) => {
-                              const driver = drivers.find(d => d.id === ride.driverId);
-                              const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
-                              return (
-                                <tr key={ride.id} className="border-t border-gray-300">
-                                  <td className="p-2 text-gray-900">{driver?.name || "Unknown Driver"}</td>
-                                  <td className="text-gray-900">{driver?.plate || "N/A"}</td>
-                                  <td className="text-gray-900">{ride.dropoffName}</td>
-                                  <td className="text-gray-900">{startedAt.toLocaleString()}</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                    {/* Filter Inputs */}
+                    <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <input
+                        type="text"
+                        placeholder="Filter by driver name"
+                        value={historySearchName}
+                        onChange={(e) => setHistorySearchName(e.target.value)}
+                        className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Filter by plate number"
+                        value={historySearchPlate}
+                        onChange={(e) => setHistorySearchPlate(e.target.value)}
+                        className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="date"
+                        placeholder="Start date"
+                        value={historyStartDate ? historyStartDate.toISOString().split('T')[0] : ''}
+                        onChange={(e) => setHistoryStartDate(e.target.value ? new Date(e.target.value) : null)}
+                        className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="date"
+                        placeholder="End date"
+                        value={historyEndDate ? historyEndDate.toISOString().split('T')[0] : ''}
+                        onChange={(e) => setHistoryEndDate(e.target.value ? new Date(e.target.value) : null)}
+                        className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    {(() => {
+                      const filteredHistory = destinationHistory.filter((ride) => {
+                        const driver = drivers.find(d => d.id === ride.driverId);
+                        const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+
+                        const matchesName = !historySearchName || (driver?.name || "").toLowerCase().includes(historySearchName.toLowerCase());
+                        const matchesPlate = !historySearchPlate || (driver?.plate || "").toLowerCase().includes(historySearchPlate.toLowerCase());
+                        const matchesStartDate = !historyStartDate || startedAt >= historyStartDate;
+                        const matchesEndDate = !historyEndDate || startedAt <= historyEndDate;
+
+                        return matchesName && matchesPlate && matchesStartDate && matchesEndDate;
+                      });
+
+                      return filteredHistory.length === 0 ? (
+                        <p className="text-gray-500">No rides found matching the filters.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm bg-white rounded overflow-hidden border border-gray-300">
+                            <thead>
+                              <tr className="bg-gray-50 text-left">
+                                <th className="p-2">Driver Name</th>
+                                <th>Plate Number</th>
+                                <th>Destination</th>
+                                <th>Date and Time</th>
+                                <th className="text-right pr-4">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredHistory.map((ride) => {
+                                const driver = drivers.find(d => d.id === ride.driverId);
+                                const startedAt = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+                                return (
+                                  <tr key={ride.id} className="border-t border-gray-300">
+                                    <td className="p-2 text-gray-900">{driver?.name || "Unknown Driver"}</td>
+                                    <td className="text-gray-900">{driver?.plate || "N/A"}</td>
+                                    <td className="text-gray-900">{ride.dropoffName}</td>
+                                    <td className="text-gray-900">{startedAt.toLocaleString()}</td>
+                                    <td className="p-2 text-right pr-4">
+                                      <button
+                                        onClick={async () => {
+                                          if (window.confirm(`Are you sure you want to delete this ride record for ${driver?.name || "Unknown Driver"}?`)) {
+                                            try {
+                                              await deleteDoc(doc(db, "ride_logs", ride.id));
+                                              toast.success("Ride record deleted");
+                                              // Log the action
+                                              await setDoc(doc(collection(db, "adminAccessLogs")), {
+                                                email: user?.email,
+                                                action: `Deleted ride record: ${driver?.name || "Unknown Driver"} (${driver?.plate || "N/A"}) - ${ride.dropoffName} - ${startedAt.toLocaleString()}`,
+                                                timestamp: serverTimestamp(),
+                                              });
+                                              // Refresh the history data
+                                              fetchDestinationHistory();
+                                            } catch (error: any) {
+                                              toast.error("Failed to delete ride record: " + error.message);
+                                            }
+                                          }
+                                        }}
+                                        className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
+                                      >
+                                        Delete
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -1526,11 +1675,11 @@ const Admin = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4 overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 overflow-y-auto h-full">
             {/* Status - Small Card */}
             <div
               onClick={() => setZoomedSection("status")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-yellow-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-2 text-yellow-900 flex items-center gap-2">
                 <Activity size={20} />
@@ -1554,96 +1703,10 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* Average Wait Time - Small Card */}
-            <div
-              onClick={() => setZoomedSection("analytics")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-orange-900 flex items-center gap-2">
-                <Activity size={20} />
-                Avg Wait Time
-              </h3>
-              <div className="space-y-2">
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Average Wait Time</p>
-                  <p className="text-2xl font-bold text-orange-600">{averageWaitTimes[0]?.toFixed(2) || 0} min</p>
-                </div>
-                <p className="text-xs text-gray-600">Average time in queue per trip</p>
-              </div>
-            </div>
-
-            {/* Travel Time per Distance - Small Card */}
-            <div
-              onClick={() => setZoomedSection("analytics")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-teal-900 flex items-center gap-2">
-                <BarChart3 size={20} />
-                Travel Time/Distance
-              </h3>
-              <div className="space-y-2">
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Avg Time per Km</p>
-                  <p className="text-2xl font-bold text-teal-600">{avgTimePerKm.toFixed(2)} min/km</p>
-                </div>
-                <p className="text-xs text-gray-600">Average travel time per kilometer</p>
-              </div>
-            </div>
-
-            {/* Analytics - Large Card */}
-            <div
-              onClick={() => setZoomedSection("analytics")}
-              className="col-span-1 md:col-span-4 lg:col-span-4 bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-blue-900 flex items-center gap-2">
-                <BarChart3 size={20} />
-                Analytics Dashboard
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Total Rides</p>
-                  <p className="text-2xl font-bold text-blue-600">{totalRides}</p>
-                </div>
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Total Earnings</p>
-                  <p className="text-2xl font-bold text-green-600">₱{totalEarnings}</p>
-                </div>
-              </div>
-              {lineChartData.categories.length > 0 && (
-                <div className="mt-4 h-32">
-                  <Line
-                    data={{
-                      labels: lineChartData.categories.slice(-7), // Last 7 days
-                      datasets: lineChartData.series.map((s, index) => ({
-                        label: s.name,
-                        data: s.data.slice(-7),
-                        borderColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
-                        backgroundColor: `hsl(${120 - (index * 30)}, 70%, 50%)`,
-                        tension: 0.1,
-                        pointRadius: 2,
-                      })),
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      scales: {
-                        x: { display: false },
-                        y: { display: false },
-                      },
-                      plugins: {
-                        legend: { display: false },
-                        tooltip: { enabled: false },
-                      },
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-
             {/* Queue - Medium Card */}
             <div
               onClick={() => setZoomedSection("queue")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-green-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-2 text-green-900 flex items-center gap-2">
                 <ListOrdered size={20} />
@@ -1671,7 +1734,7 @@ const Admin = () => {
             {/* Drivers - Small Card */}
             <div
               onClick={() => setZoomedSection("drivers")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-purple-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-2 text-purple-900 flex items-center gap-2">
                 <Users size={20} />
@@ -1699,55 +1762,10 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* Logs - Small Card */}
-            <div
-              onClick={() => setZoomedSection("logs")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-gray-900 flex items-center gap-2">
-                <FileText size={20} />
-                Activity Logs
-              </h3>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {logs.slice(0, 3).map((log) => (
-                  <div key={log.id} className="bg-white p-2 rounded shadow-sm text-xs">
-                    <p className="font-medium truncate">{log.action}</p>
-                    <p className="text-gray-500">{log.timestamp?.seconds ? formatTime(log.timestamp.seconds) : "No time"}</p>
-                  </div>
-                ))}
-                {logs.length > 3 && (
-                  <p className="text-xs text-gray-500">+{logs.length - 3} more</p>
-                )}
-              </div>
-              <div className="mt-2 text-sm font-bold text-gray-700">
-                Total Logs: {logs.length}
-              </div>
-            </div>
-
-            {/* History - Small Card */}
-            <div
-              onClick={() => setZoomedSection("history")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
-            >
-              <h3 className="text-lg font-bold mb-2 text-indigo-900 flex items-center gap-2">
-                <History size={20} />
-                Driver History
-              </h3>
-              <div className="space-y-2">
-                <div className="bg-white p-3 rounded shadow-sm">
-                  <p className="text-sm text-gray-600">Registered Drivers</p>
-                  <p className="text-2xl font-bold text-indigo-600">{drivers.length}</p>
-                </div>
-                <div className="text-xs text-gray-600">
-                  <p>View registration history and ride logs.</p>
-                </div>
-              </div>
-            </div>
-
             {/* Pending - Small Card */}
             <div
               onClick={() => setZoomedSection("pending")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-red-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-2 text-red-900 flex items-center gap-2">
                 <AlertCircle size={20} />
@@ -1774,10 +1792,160 @@ const Admin = () => {
               </div>
             </div>
 
+            {/* Analytics - Large Card */}
+            <div
+              onClick={() => setZoomedSection("analytics")}
+              className="col-span-2 md:col-span-4 lg:col-span-6 row-span-6 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-blue-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-4 text-blue-900 flex items-center gap-2">
+                <BarChart3 size={20} />
+                Ride Volume Report
+              </h3>
+
+              {/* Report Stats */}
+              {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="bg-white p-3 rounded shadow-sm text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-1">
+                      {heatmapData.data.flat().reduce((sum, val) => sum + val, 0)}
+                    </div>
+                    <p className="text-xs text-gray-600">Total Rides</p>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm text-center">
+                    <div className="text-2xl font-bold text-green-600 mb-1">
+                      {(() => {
+                        const hourTotals = heatmapData.hours.map((_, hourIndex) =>
+                          heatmapData.data.reduce((sum, dayData) => sum + dayData[hourIndex], 0)
+                        );
+                        const maxIndex = hourTotals.indexOf(Math.max(...hourTotals));
+                        return heatmapData.hours[maxIndex];
+                      })()}
+                    </div>
+                    <p className="text-xs text-gray-600">Peak Hour</p>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm text-center">
+                    <div className="text-2xl font-bold text-orange-600 mb-1">
+                      {(() => {
+                        const dayTotals = heatmapData.data.map(dayData =>
+                          dayData.reduce((sum, val) => sum + val, 0)
+                        );
+                        const maxIndex = dayTotals.indexOf(Math.max(...dayTotals));
+                        const date = heatmapData.dates[maxIndex];
+                        if (analyticsFilter === 'annually') {
+                          return new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                        } else if (analyticsFilter === 'weekly') {
+                          return new Date(date).toLocaleString('en-US', { weekday: 'short' });
+                        } else {
+                          return new Date(date).getDate().toString();
+                        }
+                      })()}
+                    </div>
+                    <p className="text-xs text-gray-600">Busiest Day</p>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm text-center">
+                    <div className="text-2xl font-bold text-purple-600 mb-1">
+                      {(() => {
+                        const total = heatmapData.data.flat().reduce((sum, val) => sum + val, 0);
+                        const avg = total / (heatmapData.dates.length * heatmapData.hours.length);
+                        return avg.toFixed(1);
+                      })()}
+                    </div>
+                    <p className="text-xs text-gray-600">Avg/Hour</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Heatmap Visualization */}
+              {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <div className="overflow-x-auto">
+                    <div className="inline-block min-w-full">
+                      {/* Header row with dates */}
+                      <div className="flex">
+                        <div className="w-12 flex-shrink-0"></div>
+                        {heatmapData.dates.slice(-7).map((date, index) => {
+                          let displayText = '';
+                          if (analyticsFilter === 'annually') {
+                            displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                          } else if (analyticsFilter === 'weekly') {
+                            displayText = new Date(date).toLocaleString('en-US', { weekday: 'short' });
+                          } else {
+                            displayText = new Date(date).getDate().toString();
+                          }
+                          return (
+                            <div key={index} className="flex-1 min-w-8 text-center text-xs font-medium text-gray-600 p-1">
+                              {displayText}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Data rows - show first 8 hours for grid view */}
+                      {heatmapData.hours.slice(0, 8).map((hour, hourIndex) => {
+                        return (
+                          <div key={hourIndex} className="flex">
+                            {/* Hour label */}
+                            <div className="w-12 flex-shrink-0 text-xs font-medium text-gray-600 p-1 flex items-center justify-end">
+                              {hour}
+                            </div>
+                            {/* Cells */}
+                            {heatmapData.dates.slice(-7).map((date, dateIndex) => {
+                              const value = heatmapData.data[dateIndex][hourIndex];
+                              let bgColor = 'bg-gray-100'; // Default white for 0 rides
+
+                              if (value >= 1 && value <= 3) {
+                                bgColor = 'bg-blue-200'; // Light blue for 1-3 rides
+                              } else if (value >= 4 && value <= 7) {
+                                bgColor = 'bg-blue-400'; // Medium blue for 4-7 rides
+                              } else if (value >= 8 && value <= 10) {
+                                bgColor = 'bg-orange-400'; // Orange for 8-10 rides
+                              } else if (value > 10) {
+                                bgColor = 'bg-red-500'; // Red for 10+ rides
+                              }
+
+                              return (
+                                <div
+                                  key={dateIndex}
+                                  className={`flex-1 min-w-8 h-6 ${bgColor} border border-gray-200`}
+                                  title={`${(() => {
+                                    if (analyticsFilter === 'annually') {
+                                      return new Date(date + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                                    } else if (analyticsFilter === 'weekly') {
+                                      return new Date(date).toLocaleString('en-US', { weekday: 'long' });
+                                    } else {
+                                      return new Date(date).toLocaleDateString();
+                                    }
+                                  })()} ${hour}: ${value} rides`}
+                                ></div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Legend */}
+                  <div className="mt-2 flex items-center justify-center gap-1 text-xs text-gray-600">
+                    <span>0</span>
+                    <div className="flex gap-0.5">
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => {
+                        let bgColor = 'bg-gray-100';
+                        if (i >= 1 && i <= 3) bgColor = 'bg-blue-200';
+                        else if (i >= 4 && i <= 7) bgColor = 'bg-blue-400';
+                        else if (i >= 8 && i <= 10) bgColor = 'bg-orange-400';
+                        else if (i > 10) bgColor = 'bg-red-500';
+                        return <div key={i} className={`w-3 h-3 ${bgColor} border border-gray-300`}></div>;
+                      })}
+                    </div>
+                    <span>10+</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Top Drop-offs - Small Card */}
             <div
               onClick={() => setZoomedSection("analytics")}
-              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+              className="col-span-1 md:col-span-2 lg:col-span-2 row-span-6 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-indigo-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-2 text-indigo-900 flex items-center gap-2">
                 <BarChart3 size={20} />
@@ -1793,6 +1961,26 @@ const Admin = () => {
                 {topDropoffs.length === 0 && (
                   <p className="text-xs text-gray-600">No data available</p>
                 )}
+              </div>
+            </div>
+
+            {/* History - Small Card */}
+            <div
+              onClick={() => setZoomedSection("history")}
+              className="col-span-2 md:col-span-2 lg:col-span-8 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-indigo-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-indigo-900 flex items-center gap-2">
+                <History size={20} />
+                Driver History
+              </h3>
+              <div className="space-y-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-sm text-gray-600">Registered Drivers</p>
+                  <p className="text-2xl font-bold text-indigo-600">{drivers.length}</p>
+                </div>
+                <div className="text-xs text-gray-600">
+                  <p>View registration history and ride logs.</p>
+                </div>
               </div>
             </div>
           </div>
