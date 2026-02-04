@@ -725,7 +725,7 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Sidebar */}
       <div className={`fixed top-0 left-0 h-full bg-white text-gray-900 transition-all duration-300 overflow-hidden overscroll-none z-10 ${sidebarOpen ? 'w-full md:w-64' : 'w-0'}`}>
         <div className="p-6 h-full flex flex-col">
@@ -777,6 +777,10 @@ const Admin = () => {
 
       {/* Main Content */}
       <div className={`p-4 text-gray-900 ${sidebarOpen ? 'md:ml-64' : ''} ${isMobile && sidebarOpen ? 'overflow-hidden' : ''}`}>
+        <div className="text-center py-4 mb-4 rounded-lg flex items-center justify-center gap-4">
+          <img src="/img/logo.png" alt="Logo" className="h-12 w-auto" />
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent">NEXT IN LINE</h1>
+        </div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <button
