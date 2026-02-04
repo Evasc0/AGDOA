@@ -305,10 +305,10 @@ const Login = () => {
       {showQueue ? (
         <div className="flex flex-col items-center justify-start flex-1 p-2 sm:p-4">
           <div className="animated-gradient p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl">
-            <h1 className="text-2xl sm:text-3xl font-bold mb-4 text-center text-green-200">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-5 text-center bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent">
               Welcome to Agduwa
             </h1>
-            <h2 className="text-lg sm:text-xl font-semibold mb-6 text-center text-green-100">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent text-center">
               Active Drivers Queue
             </h2>
             {queue.length === 0 ? (
