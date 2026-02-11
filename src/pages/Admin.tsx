@@ -742,7 +742,7 @@ const Admin = () => {
           const date = new Date(now);
           date.setDate(now.getDate() - i);
           const key = date.toISOString().split('T')[0];
-          const label = date.getDate().toString();
+          const label = date.getDate() + ' ' + date.toLocaleString('en-US', { month: 'short' });
           categories.push({ key, label });
         }
       } else if (analyticsFilter === 'annually') {
@@ -854,18 +854,18 @@ const Admin = () => {
     }
   };
 
-  // Fetch analytics on mount and when zoomed section changes to analytics or filter changes
+  // Fetch analytics on mount, when filter changes, and when zoomed section changes to analytics
   useEffect(() => {
     if (user) {
       fetchAnalytics();
     }
-  }, [user]);
+  }, [user, analyticsFilter]);
 
   useEffect(() => {
     if (zoomedSection === "analytics" && user) {
       fetchAnalytics();
     }
-  }, [zoomedSection, analyticsFilter, user, selectedDailyDate]);
+  }, [zoomedSection, user]);
 
   // Handlers for AnalyticsFilterModal
   const handleApplyAnalyticsFilter = (start: Date | null, end: Date | null) => {
@@ -1053,7 +1053,7 @@ const Admin = () => {
                             {(() => {
                               const total = heatmapData.data.flat().reduce((sum, val) => sum + val, 0);
                               const avg = total / (heatmapData.dates.length * heatmapData.hours.length);
-                              return avg.toFixed(1);
+                              return Math.round(avg);
                             })()}
                           </div>
                           <p className="text-sm text-gray-600">Avg Rides/Hour</p>
@@ -1068,27 +1068,32 @@ const Admin = () => {
                       <BarChart3 size={24} />
                       Ride Volume Heatmap
                     </h3>
+                    <p className="text-center text-gray-600 mb-4">
+                      {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    </p>
                     {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
                       <div className="overflow-x-auto">
                         <div className="inline-block min-w-full">
                           {/* Header row with dates */}
                           <div className="flex">
                             <div className="w-16 flex-shrink-0"></div>
-                            {heatmapData.dates.map((date, index) => {
-                              let displayText = '';
-                              if (analyticsFilter === 'annually') {
-                                displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
-                              } else if (analyticsFilter === 'weekly') {
-                                displayText = new Date(date).toLocaleString('en-US', { weekday: 'short' });
-                              } else {
-                                displayText = new Date(date).getDate().toString();
-                              }
-                              return (
-                                <div key={index} className="flex-1 min-w-12 text-center text-xs font-medium text-gray-600 p-2">
-                                  {displayText}
-                                </div>
-                              );
-                            })}
+                          {heatmapData.dates.map((date, index) => {
+                            let displayText = '';
+                            if (analyticsFilter === 'annually') {
+                              displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                            } else if (analyticsFilter === 'monthly') {
+                              const dateObj = new Date(date);
+                              displayText = dateObj.getDate().toString();
+                            } else {
+                              const dateObj = new Date(date);
+                              displayText = dateObj.getDate() + ' ' + dateObj.toLocaleString('en-US', { weekday: 'short' });
+                            }
+                            return (
+                              <div key={index} className="flex-1 min-w-12 text-center text-xs font-medium text-gray-600 p-2">
+                                {displayText}
+                              </div>
+                            );
+                          })}
                           </div>
                           {/* Data rows */}
                           {heatmapData.hours.map((hour, hourIndex) => {
@@ -1793,14 +1798,33 @@ const Admin = () => {
             </div>
 
             {/* Analytics - Large Card */}
-            <div
-              onClick={() => setZoomedSection("analytics")}
-              className="col-span-2 md:col-span-4 lg:col-span-6 row-span-6 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-blue-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            <div className="col-span-2 md:col-span-4 lg:col-span-6 row-span-6 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-blue-200 shadow-sm hover:shadow-lg transition-all duration-300"
             >
               <h3 className="text-lg font-bold mb-4 text-blue-900 flex items-center gap-2">
                 <BarChart3 size={20} />
                 Ride Volume Report
               </h3>
+
+              {/* Filter Buttons */}
+              <div className="flex gap-2 mb-4 flex-wrap">
+                {['weekly', 'monthly', 'annually'].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAnalyticsFilter(filter as any);
+                      fetchAnalytics();
+                    }}
+                    className={`px-4 py-2 rounded-lg font-medium text-xs transition-all duration-200 ${
+                      analyticsFilter === filter
+                        ? "bg-blue-600 text-white shadow-lg"
+                        : "bg-white text-blue-700 hover:bg-blue-50 shadow-md"
+                    }`}
+                  >
+                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </button>
+                ))}
+              </div>
 
               {/* Report Stats */}
               {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
@@ -1845,12 +1869,12 @@ const Admin = () => {
                   <div className="bg-white p-3 rounded shadow-sm text-center">
                     <div className="text-2xl font-bold text-purple-600 mb-1">
                       {(() => {
-                        const total = heatmapData.data.flat().reduce((sum, val) => sum + val, 0);
-                        const avg = total / (heatmapData.dates.length * heatmapData.hours.length);
-                        return avg.toFixed(1);
+                              const total = heatmapData.data.flat().reduce((sum, val) => sum + val, 0);
+                              const avg = total / (heatmapData.dates.length * heatmapData.hours.length);
+                              return Math.round(avg);
                       })()}
                     </div>
-                    <p className="text-xs text-gray-600">Avg/Hour</p>
+                    <p className="text-xs text-gray-600">Avg. Ride per Hour</p>
                   </div>
                 </div>
               )}
@@ -1858,29 +1882,38 @@ const Admin = () => {
               {/* Heatmap Visualization */}
               {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
                 <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-center text-gray-600 mb-4">
+                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </p>
                   <div className="overflow-x-auto">
                     <div className="inline-block min-w-full">
                       {/* Header row with dates */}
                       <div className="flex">
                         <div className="w-12 flex-shrink-0"></div>
-                        {heatmapData.dates.slice(-7).map((date, index) => {
-                          let displayText = '';
-                          if (analyticsFilter === 'annually') {
-                            displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
-                          } else if (analyticsFilter === 'weekly') {
-                            displayText = new Date(date).toLocaleString('en-US', { weekday: 'short' });
-                          } else {
-                            displayText = new Date(date).getDate().toString();
-                          }
-                          return (
-                            <div key={index} className="flex-1 min-w-8 text-center text-xs font-medium text-gray-600 p-1">
-                              {displayText}
-                            </div>
-                          );
-                        })}
+                        {(() => {
+                          const sliceCount = analyticsFilter === 'weekly' ? -7 : analyticsFilter === 'monthly' ? -30 : analyticsFilter === 'annually' ? -12 : -7;
+                          return heatmapData.dates.slice(sliceCount).map((date, index) => {
+                            let displayText = '';
+                            if (analyticsFilter === 'annually') {
+                              displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
+                            } else if (analyticsFilter === 'monthly') {
+                              const dateObj = new Date(date);
+                              displayText = dateObj.getDate().toString();
+                            } else {
+                              const dateObj = new Date(date);
+                              displayText = dateObj.getDate() + ' ' + dateObj.toLocaleString('en-US', { weekday: 'short' });
+                            }
+                            return (
+                              <div key={index} className="flex-1 min-w-8 text-center text-xs font-medium text-gray-600 p-1">
+                                {displayText}
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                       {/* Data rows - show first 8 hours for grid view */}
                       {heatmapData.hours.slice(0, 8).map((hour, hourIndex) => {
+                        const sliceCount = analyticsFilter === 'weekly' ? -7 : analyticsFilter === 'monthly' ? -30 : analyticsFilter === 'annually' ? -12 : -7;
                         return (
                           <div key={hourIndex} className="flex">
                             {/* Hour label */}
@@ -1888,7 +1921,7 @@ const Admin = () => {
                               {hour}
                             </div>
                             {/* Cells */}
-                            {heatmapData.dates.slice(-7).map((date, dateIndex) => {
+                            {heatmapData.dates.slice(sliceCount).map((date, dateIndex) => {
                               const value = heatmapData.data[dateIndex][hourIndex];
                               let bgColor = 'bg-gray-100'; // Default white for 0 rides
 
@@ -1951,8 +1984,11 @@ const Admin = () => {
                 <BarChart3 size={20} />
                 Top Drop-offs
               </h3>
+              <p className="text-xs text-indigo-700 mb-2">
+                {analyticsFilter === 'weekly' ? 'This Week' : analyticsFilter === 'monthly' ? 'This Month' : analyticsFilter === 'annually' ? 'This Year' : 'Custom Period'}
+              </p>
               <div className="space-y-2">
-                {topDropoffs.slice(0, 3).map((dropoff, index) => (
+                {topDropoffs.slice(0, 7).map((dropoff, index) => (
                   <div key={index} className="bg-white p-2 rounded shadow-sm text-xs">
                     <p className="font-medium">{dropoff.name}</p>
                     <p className="text-gray-600">{dropoff.count} trips</p>

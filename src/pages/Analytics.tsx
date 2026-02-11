@@ -23,7 +23,7 @@ import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
 // Register Chart.js components
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
 
-const OPENWEATHER_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
+const anlytic_API_KEY = 'cdbb40b30135e8397fe914b98c469d44';
 
 type WeatherData = {
   date: string;
@@ -72,7 +72,7 @@ const Analytics: React.FC = () => {
   const fetchWeather = useCallback(() => {
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${coords.latitude}&lon=${coords.longitude}&units=metric&appid=${OPENWEATHER_API_KEY}`);
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${coords.latitude}&lon=${coords.longitude}&units=metric&appid=${anlytic_API_KEY}`);
         const data = await res.json();
 
         const daily: WeatherData[] = data.list
