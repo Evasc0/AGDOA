@@ -9,6 +9,21 @@ import { useRide } from "../components/RideContext";
 
 const AVERAGE_WAIT_TIME_PER_DRIVER = 20; // in minutes
 
+// Helper function to generate destination options sorted by fare
+const getSortedDestinations = (): { location: string; fare: number; tripType: string; displayText: string }[] => {
+  const locations = Object.keys(fareMatrix);
+  return locations
+    .sort((a, b) => fareMatrix[a] - fareMatrix[b])
+    .map((location) => {
+      const fare = fareMatrix[location];
+      const tripType = fare >= 500 ? "LT" : "ST";
+      const displayText = `${tripType} ${location} ₱${fare}`;
+      return { location, fare, tripType, displayText };
+    });
+};
+
+const sortedDestinations = getSortedDestinations();
+
 const Home = () => {
   const navigate = useNavigate();
   const {
@@ -145,9 +160,9 @@ const Home = () => {
                 onChange={(e) => setSelectedDestination(e.target.value)}
               >
                 <option value="">Select Destination</option>
-                {Object.keys(fareMatrix).map((location) => (
-                  <option key={location} value={location}>
-                    {location}
+                {sortedDestinations.map((dest) => (
+                  <option key={dest.location} value={dest.location}>
+                    {dest.displayText}
                   </option>
                 ))}
               </select>
