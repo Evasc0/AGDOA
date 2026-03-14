@@ -8,6 +8,24 @@ interface Props {
   onClear?: () => void;
 }
 
+const toInputDate = (date: Date | null) => {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseInputDate = (value: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map((part) => parseInt(part, 10));
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const endOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
 const AnalyticsFilterModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -35,9 +53,8 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
-                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                setStartDate(todayStart);
-                setEndDate(now);
+                setStartDate(startOfDay(now));
+                setEndDate(endOfDay(now));
                 setSelectedMonth(null);
                 setSelectedYear(null);
               }}
@@ -48,10 +65,10 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
-                const sevenDaysAgo = new Date(now);
-                sevenDaysAgo.setDate(now.getDate() - 7);
+                const sevenDaysAgo = startOfDay(now);
+                sevenDaysAgo.setDate(now.getDate() - 6);
                 setStartDate(sevenDaysAgo);
-                setEndDate(now);
+                setEndDate(endOfDay(now));
                 setSelectedMonth(null);
                 setSelectedYear(null);
               }}
@@ -62,9 +79,9 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
               onClick={() => {
                 const now = new Date();
-                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                const firstDay = startOfDay(new Date(now.getFullYear(), now.getMonth(), 1));
                 setStartDate(firstDay);
-                setEndDate(now);
+                setEndDate(endOfDay(now));
                 setSelectedMonth(null);
                 setSelectedYear(null);
               }}
@@ -89,9 +106,9 @@ const AnalyticsFilterModal: React.FC<Props> = ({
             <input
               type="date"
               className="w-full px-3 py-2 rounded bg-white border border-gray-300"
-              value={startDate ? startDate.toISOString().split('T')[0] : ''}
+              value={toInputDate(startDate)}
               onChange={(e) =>
-                setStartDate(e.target.value ? new Date(e.target.value) : null)
+                setStartDate(parseInputDate(e.target.value))
               }
             />
           </div>
@@ -101,9 +118,9 @@ const AnalyticsFilterModal: React.FC<Props> = ({
             <input
               type="date"
               className="w-full px-3 py-2 rounded bg-white border border-gray-300"
-              value={endDate ? endDate.toISOString().split('T')[0] : ''}
+              value={toInputDate(endDate)}
               onChange={(e) =>
-                setEndDate(e.target.value ? new Date(e.target.value) : null)
+                setEndDate(parseInputDate(e.target.value))
               }
             />
           </div>
@@ -114,7 +131,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={selectedMonth ?? ''}
               onChange={(e) =>
-                setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)
+                setSelectedMonth(e.target.value ? parseInt(e.target.value, 10) : null)
               }
             >
               <option value="">Select Month</option>
@@ -132,7 +149,7 @@ const AnalyticsFilterModal: React.FC<Props> = ({
               className="w-full px-3 py-2 rounded bg-white border border-gray-300"
               value={selectedYear ?? ''}
               onChange={(e) =>
-                setSelectedYear(e.target.value ? parseInt(e.target.value) : null)
+                setSelectedYear(e.target.value ? parseInt(e.target.value, 10) : null)
               }
             >
               <option value="">Select Year</option>
@@ -172,6 +189,14 @@ const AnalyticsFilterModal: React.FC<Props> = ({
                 if (selectedMonth !== null && selectedYear !== null) {
                   finalStart = new Date(selectedYear, selectedMonth, 1);
                   finalEnd = new Date(selectedYear, selectedMonth + 1, 0);
+                }
+                if (finalStart) finalStart = startOfDay(finalStart);
+                if (finalEnd) finalEnd = endOfDay(finalEnd);
+                if (finalStart && finalEnd && finalStart.getTime() > finalEnd.getTime()) {
+                  const swappedStart = startOfDay(finalEnd);
+                  const swappedEnd = endOfDay(finalStart);
+                  finalStart = swappedStart;
+                  finalEnd = swappedEnd;
                 }
                 onApply(finalStart, finalEnd);
               }}

@@ -118,6 +118,33 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
 };
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
+const toLocalDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const toMonthKey = (date: Date) => `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}`;
+const getStartOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const getEndOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+const parseLocalDateKey = (key: string) => {
+  const [year, month, day] = key.split("-").map((part) => Number(part));
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+const parseMonthKey = (key: string) => {
+  const [year, month] = key.split("-").map((part) => Number(part));
+  if (!year || !month) return null;
+  return new Date(year, month - 1, 1);
+};
 
 // Helper function to bucket rides by date and hour
 const bucketRidesByHour = (rides: any[], filter: 'weekly' | 'monthly' | 'annually' | 'custom', startDate?: Date, endDate?: Date) => {
@@ -133,25 +160,26 @@ const bucketRidesByHour = (rides: any[], filter: 'weekly' | 'monthly' | 'annuall
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(now.getDate() - i);
-      dates.push(date.toISOString().split('T')[0]);
+      dates.push(toLocalDateKey(date));
     }
   } else if (filter === 'monthly') {
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(now.getDate() - i);
-      dates.push(date.toISOString().split('T')[0]);
+      dates.push(toLocalDateKey(date));
     }
   } else if (filter === 'annually') {
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now);
       date.setMonth(now.getMonth() - i);
-      dates.push(date.toISOString().slice(0, 7)); // YYYY-MM
+      dates.push(toMonthKey(date)); // YYYY-MM
     }
   } else if (filter === 'custom' && startDate && endDate) {
     // For custom filter, generate all dates between start and end
-    const currentDate = new Date(startDate);
-    while (currentDate <= endDate) {
-      dates.push(currentDate.toISOString().split('T')[0]);
+    const currentDate = getStartOfDay(startDate);
+    const endOfRange = getStartOfDay(endDate);
+    while (currentDate <= endOfRange) {
+      dates.push(toLocalDateKey(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
   }
@@ -169,9 +197,9 @@ const bucketRidesByHour = (rides: any[], filter: 'weekly' | 'monthly' | 'annuall
     const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
     let dateKey: string;
     if (filter === 'annually') {
-      dateKey = rideDate.toISOString().slice(0, 7);
+      dateKey = toMonthKey(rideDate);
     } else {
-      dateKey = rideDate.toISOString().split('T')[0];
+      dateKey = toLocalDateKey(rideDate);
     }
 
     if (buckets[dateKey]) {
@@ -618,14 +646,24 @@ const Admin = () => {
 
       const now = new Date();
       let startDate: Date;
-
       let filteredRides: any[] = [];
+      let customRangeStart: Date | null = null;
+      let customRangeEnd: Date | null = null;
 
-      if (analyticsFilter === 'custom' && analyticsStartDate && analyticsEndDate) {
-        filteredRides = rides.filter(ride => {
-          const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
-          return rideDate >= analyticsStartDate && rideDate <= analyticsEndDate;
-        });
+      if (analyticsFilter === 'custom') {
+        if (analyticsStartDate && analyticsEndDate) {
+          const rangeStart = getStartOfDay(analyticsStartDate);
+          const rangeEnd = getEndOfDay(analyticsEndDate);
+          customRangeStart = rangeStart;
+          customRangeEnd = rangeEnd;
+          filteredRides = rides.filter(ride => {
+            const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
+            return rideDate >= rangeStart && rideDate <= rangeEnd;
+          });
+        } else {
+          // "All Time" custom range
+          filteredRides = rides;
+        }
       } else {
         switch (analyticsFilter) {
           case 'weekly':
@@ -645,6 +683,18 @@ const Admin = () => {
           const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
           return rideDate >= startDate;
         });
+      }
+
+      if (analyticsFilter === 'custom' && (!customRangeStart || !customRangeEnd) && filteredRides.length > 0) {
+        const rideDates = filteredRides
+          .map(ride => ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000))
+          .filter((date: Date) => !Number.isNaN(date.getTime()))
+          .sort((a: Date, b: Date) => a.getTime() - b.getTime());
+
+        if (rideDates.length > 0) {
+          customRangeStart = getStartOfDay(rideDates[0]);
+          customRangeEnd = getEndOfDay(rideDates[rideDates.length - 1]);
+        }
       }
 
       // Calculate per-driver stats first
@@ -707,9 +757,9 @@ const Admin = () => {
         const rideDate = ride.startedAt?.toDate ? ride.startedAt.toDate() : new Date(ride.startedAt?.seconds * 1000);
         let dateKey: string;
         if (analyticsFilter === 'annually') {
-          dateKey = rideDate.toISOString().slice(0, 7); // YYYY-MM
+          dateKey = toMonthKey(rideDate); // YYYY-MM
         } else {
-          dateKey = rideDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          dateKey = toLocalDateKey(rideDate); // YYYY-MM-DD
         }
         if (!dateMap[dateKey]) dateMap[dateKey] = {};
         const driverId = ride.driverId;
@@ -733,7 +783,7 @@ const Admin = () => {
         for (let i = 6; i >= 0; i--) {
           const date = new Date(now);
           date.setDate(now.getDate() - i);
-          const key = date.toISOString().split('T')[0];
+          const key = toLocalDateKey(date);
           const label = date.getDate().toString();
           categories.push({ key, label });
         }
@@ -741,7 +791,7 @@ const Admin = () => {
         for (let i = 29; i >= 0; i--) {
           const date = new Date(now);
           date.setDate(now.getDate() - i);
-          const key = date.toISOString().split('T')[0];
+          const key = toLocalDateKey(date);
           const label = date.getDate() + ' ' + date.toLocaleString('en-US', { month: 'short' });
           categories.push({ key, label });
         }
@@ -749,12 +799,21 @@ const Admin = () => {
         for (let i = 11; i >= 0; i--) {
           const date = new Date(now);
           date.setMonth(now.getMonth() - i);
-          const key = date.toISOString().slice(0, 7);
+          const key = toMonthKey(date);
           const label = date.toLocaleString('en-US', { month: 'short' });
           categories.push({ key, label });
         }
+      } else if (analyticsFilter === 'custom' && customRangeStart && customRangeEnd) {
+        const currentDate = getStartOfDay(customRangeStart);
+        const endOfRange = getStartOfDay(customRangeEnd);
+        while (currentDate <= endOfRange) {
+          const key = toLocalDateKey(currentDate);
+          const label = currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          categories.push({ key, label });
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
       } else {
-        // For custom or default, use existing logic
+        // Fallback for any unexpected state
         categories = Object.keys(dateMap).sort().map(key => ({ key, label: key }));
       }
 
@@ -766,7 +825,12 @@ const Admin = () => {
       setLineChartData({ categories: categories.map(c => c.label), series });
 
       // Calculate heatmap data for ride volume
-      const heatmapData = bucketRidesByHour(filteredRides, analyticsFilter, analyticsStartDate || undefined, analyticsEndDate || undefined);
+      const heatmapData = bucketRidesByHour(
+        filteredRides,
+        analyticsFilter,
+        customRangeStart || undefined,
+        customRangeEnd || undefined
+      );
       setHeatmapData(heatmapData);
 
       // Calculate average wait times by linking queue joinedAt with ride startedAt
@@ -859,7 +923,7 @@ const Admin = () => {
     if (user) {
       fetchAnalytics();
     }
-  }, [user, analyticsFilter]);
+  }, [user, analyticsFilter, analyticsStartDate, analyticsEndDate]);
 
   useEffect(() => {
     if (zoomedSection === "analytics" && user) {
@@ -873,7 +937,6 @@ const Admin = () => {
     setAnalyticsEndDate(end);
     setAnalyticsFilter('custom');
     setShowAnalyticsFilterModal(false);
-    fetchAnalytics();
   };
 
   const handleClearAnalyticsFilter = () => {
@@ -881,8 +944,33 @@ const Admin = () => {
     setAnalyticsStartDate(null);
     setAnalyticsEndDate(null);
     setShowAnalyticsFilterModal(false);
-    fetchAnalytics();
   };
+
+  const analyticsPeriodLabel = (() => {
+    if (heatmapData.dates.length === 0) return "No data";
+
+    const firstKey = heatmapData.dates[0];
+    const lastKey = heatmapData.dates[heatmapData.dates.length - 1];
+
+    if (analyticsFilter === 'annually') {
+      const firstMonth = parseMonthKey(firstKey);
+      const lastMonth = parseMonthKey(lastKey);
+      if (!firstMonth || !lastMonth) return `${firstKey} - ${lastKey}`;
+      const monthFormat: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' };
+      return firstKey === lastKey
+        ? firstMonth.toLocaleDateString('en-US', monthFormat)
+        : `${firstMonth.toLocaleDateString('en-US', monthFormat)} - ${lastMonth.toLocaleDateString('en-US', monthFormat)}`;
+    }
+
+    const firstDate = parseLocalDateKey(firstKey);
+    const lastDate = parseLocalDateKey(lastKey);
+    if (!firstDate || !lastDate) return `${firstKey} - ${lastKey}`;
+
+    const dateFormat: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+    return firstKey === lastKey
+      ? firstDate.toLocaleDateString('en-US', dateFormat)
+      : `${firstDate.toLocaleDateString('en-US', dateFormat)} - ${lastDate.toLocaleDateString('en-US', dateFormat)}`;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -1069,7 +1157,7 @@ const Admin = () => {
                       Ride Volume Heatmap
                     </h3>
                     <p className="text-center text-gray-600 mb-4">
-                      {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      {analyticsPeriodLabel}
                     </p>
                     {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
                       <div className="overflow-x-auto">
@@ -1813,7 +1901,6 @@ const Admin = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setAnalyticsFilter(filter as any);
-                      fetchAnalytics();
                     }}
                     className={`px-4 py-2 rounded-lg font-medium text-xs transition-all duration-200 ${
                       analyticsFilter === filter
@@ -1883,7 +1970,7 @@ const Admin = () => {
               {heatmapData.dates.length > 0 && heatmapData.hours.length > 0 && (
                 <div className="bg-white p-3 rounded shadow-sm">
                   <p className="text-center text-gray-600 mb-4">
-                    {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    {analyticsPeriodLabel}
                   </p>
                   <div className="overflow-x-auto">
                     <div className="inline-block min-w-full">
@@ -1891,8 +1978,15 @@ const Admin = () => {
                       <div className="flex">
                         <div className="w-12 flex-shrink-0"></div>
                         {(() => {
-                          const sliceCount = analyticsFilter === 'weekly' ? -7 : analyticsFilter === 'monthly' ? -30 : analyticsFilter === 'annually' ? -12 : -7;
-                          return heatmapData.dates.slice(sliceCount).map((date, index) => {
+                          const displayedDates =
+                            analyticsFilter === 'weekly'
+                              ? heatmapData.dates.slice(-7)
+                              : analyticsFilter === 'monthly'
+                                ? heatmapData.dates.slice(-30)
+                                : analyticsFilter === 'annually'
+                                  ? heatmapData.dates.slice(-12)
+                                  : heatmapData.dates;
+                          return displayedDates.map((date, index) => {
                             let displayText = '';
                             if (analyticsFilter === 'annually') {
                               displayText = new Date(date + '-01').toLocaleString('en-US', { month: 'short' });
@@ -1913,7 +2007,15 @@ const Admin = () => {
                       </div>
                       {/* Data rows - show first 8 hours for grid view */}
                       {heatmapData.hours.slice(0, 8).map((hour, hourIndex) => {
-                        const sliceCount = analyticsFilter === 'weekly' ? -7 : analyticsFilter === 'monthly' ? -30 : analyticsFilter === 'annually' ? -12 : -7;
+                        const displayedDates =
+                          analyticsFilter === 'weekly'
+                            ? heatmapData.dates.slice(-7)
+                            : analyticsFilter === 'monthly'
+                              ? heatmapData.dates.slice(-30)
+                              : analyticsFilter === 'annually'
+                                ? heatmapData.dates.slice(-12)
+                                : heatmapData.dates;
+                        const startIndex = heatmapData.dates.length - displayedDates.length;
                         return (
                           <div key={hourIndex} className="flex">
                             {/* Hour label */}
@@ -1921,8 +2023,9 @@ const Admin = () => {
                               {hour}
                             </div>
                             {/* Cells */}
-                            {heatmapData.dates.slice(sliceCount).map((date, dateIndex) => {
-                              const value = heatmapData.data[dateIndex][hourIndex];
+                            {displayedDates.map((date, dateIndex) => {
+                              const sourceDateIndex = startIndex + dateIndex;
+                              const value = heatmapData.data[sourceDateIndex]?.[hourIndex] ?? 0;
                               let bgColor = 'bg-gray-100'; // Default white for 0 rides
 
                               if (value >= 1 && value <= 3) {
@@ -1985,7 +2088,7 @@ const Admin = () => {
                 Top Drop-offs
               </h3>
               <p className="text-xs text-indigo-700 mb-2">
-                {analyticsFilter === 'weekly' ? 'This Week' : analyticsFilter === 'monthly' ? 'This Month' : analyticsFilter === 'annually' ? 'This Year' : 'Custom Period'}
+                {analyticsPeriodLabel}
               </p>
               <div className="space-y-2">
                 {topDropoffs.slice(0, 7).map((dropoff, index) => (
