@@ -2005,8 +2005,8 @@ const Admin = () => {
                           });
                         })()}
                       </div>
-                      {/* Data rows - show first 8 hours for grid view */}
-                      {heatmapData.hours.slice(0, 8).map((hour, hourIndex) => {
+                      {/* Data rows - show all hours for grid view */}
+                      {heatmapData.hours.map((hour, hourIndex) => {
                         const displayedDates =
                           analyticsFilter === 'weekly'
                             ? heatmapData.dates.slice(-7)
@@ -2041,7 +2041,7 @@ const Admin = () => {
                               return (
                                 <div
                                   key={dateIndex}
-                                  className={`flex-1 min-w-8 h-6 ${bgColor} border border-gray-200`}
+                                  className={`flex-1 min-w-8 h-4 ${bgColor} border border-gray-200`}
                                   title={`${(() => {
                                     if (analyticsFilter === 'annually') {
                                       return new Date(date + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
