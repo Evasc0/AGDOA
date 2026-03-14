@@ -125,6 +125,7 @@ const toLocalDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 const toMonthKey = (date: Date) => `${date.getFullYear()}-${`${date.getMonth() + 1}`.padStart(2, "0")}`;
+const QUEUE_PASSENGER_CAPACITY = 6;
 const getStartOfDay = (date: Date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -1415,6 +1416,7 @@ const Admin = () => {
                                   <div>
                                     <p className="font-semibold text-green-900">{driver?.name ?? entry.name}</p>
                                     <p className="text-sm text-green-700">{driver?.plate ?? entry.plate}</p>
+                                    <p className="text-xs text-green-600">Capacity: {QUEUE_PASSENGER_CAPACITY} passengers</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -1478,7 +1480,7 @@ const Admin = () => {
                         >
                           <span>
                             {driver.name} ({driver.plate}) -{" "}
-                            <span className="font-semibold text-green-600">In Queue</span>
+                            <span className="font-semibold text-green-600">In Queue</span> • Capacity: {QUEUE_PASSENGER_CAPACITY} passengers
                           </span>
                         </li>
                       ))}
@@ -1812,6 +1814,7 @@ const Admin = () => {
                     <div key={entry.driverId} className="bg-white p-2 rounded shadow-sm text-sm">
                       <p className="font-medium">{driver?.name ?? entry.name}</p>
                       <p className="text-gray-600">{driver?.plate ?? entry.plate}</p>
+                      <p className="text-xs text-gray-500">Capacity: {QUEUE_PASSENGER_CAPACITY} passengers</p>
                     </div>
                   );
                 })}

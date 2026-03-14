@@ -21,6 +21,7 @@ import { query, orderBy, where } from "firebase/firestore";
 
 // Use the correct admin email here (case-insensitive check)
 const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
+const QUEUE_PASSENGER_CAPACITY = 6;
 
 interface QueueEntry {
   driverId: string;
@@ -322,12 +323,15 @@ const Login = () => {
 
                     return (
                       <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                        <div className="flex flex-col sm:flex-row sm:items-center">
+                        <div className="flex flex-col">
                           <span className="font-medium text-gray-900 text-sm sm:text-base">
                             {driver?.name ?? entry.name}
                           </span>
-                          <span className="text-gray-600 text-xs sm:text-sm sm:ml-2">
+                          <span className="text-gray-600 text-xs sm:text-sm">
                             ({driver?.plate ?? entry.plate}) - {driver?.vehicle ?? 'N/A'}
+                          </span>
+                          <span className="text-gray-500 text-xs">
+                            Capacity: {QUEUE_PASSENGER_CAPACITY} passengers
                           </span>
                         </div>
                         <span
