@@ -1,4 +1,4 @@
-# Agduwa Ride-Hailing App User Manual
+# Agduwa Ride-Hailing System User Manual
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -6,495 +6,329 @@
 3. [Getting Started](#getting-started)
 4. [Driver Guide](#driver-guide)
 5. [Admin Guide](#admin-guide)
-6. [Troubleshooting](#troubleshooting)
-7. [Frequently Asked Questions](#frequently-asked-questions)
+6. [Current System Rules](#current-system-rules)
+7. [Troubleshooting](#troubleshooting)
+8. [Frequently Asked Questions](#frequently-asked-questions)
 
 ## Introduction
 
-Welcome to **Agduwa**, a modern ride-hailing application designed to streamline transportation services in the Paradahan area. This manual provides comprehensive documentation for both drivers and administrators of the Agduwa platform.
+Welcome to **Agduwa**, a web-based queue and ride management system for drivers and admins.
 
-### Purpose
-This user manual serves as a complete guide for:
-- New drivers joining the platform
-- Administrators managing the system
-- Understanding system workflows and features
-- Troubleshooting common issues
+This manual is updated to reflect the **current implementation** in this repository.
 
-### Key Features
-- **Driver Registration & Verification**: Secure onboarding process
-- **Real-time Queue Management**: Fair distribution of ride requests
-- **GPS-based Location Tracking**: Geofencing for service area validation
-- **Dynamic Fare Calculation**: Automated pricing based on destinations
-- **Admin Dashboard**: Comprehensive management and analytics tools
-- **Ride History & Analytics**: Performance tracking and reporting
+### Who This Manual Is For
+
+- Drivers using the web app for queueing and ride logging
+- Admins managing drivers, queue order, approvals, and reports
 
 ## System Overview
 
 ### Architecture
-Agduwa is built using modern web technologies:
-- **Frontend**: React.js with TypeScript
-- **Backend**: Firebase (Authentication & Firestore database)
+
+- **Frontend**: React + TypeScript + Vite
+- **Backend**: Firebase Authentication + Firestore
 - **Styling**: Tailwind CSS
-- **Deployment**: Vercel
+- **Deployment**: Web deployment (for example, Vercel)
 
 ### User Roles
-1. **Drivers**: Registered users who provide transportation services
-2. **Admin**: System administrator with full platform control
 
-### Core Components
-- **Authentication System**: Secure login/registration
-- **Queue System**: Manages driver availability and ride assignments
-- **Geofencing**: Validates service area (Paradahan boundaries)
-- **Fare Matrix**: Predefined pricing structure
-- **Analytics Dashboard**: Performance metrics and reporting
+1. **Driver**
+- Registers account
+- Waits for admin approval
+- Joins queue, starts rides, views history/analytics, updates profile
+
+2. **Admin**
+- Approves/rejects driver registrations
+- Manages verified drivers and queue order
+- Views operational status, logs, history, and analytics
+
+### Main Collections Used
+
+- `drivers`
+- `queues`
+- `ride_logs`
+- `adminAccessLogs`
+- `publicProfiles`
 
 ## Getting Started
 
 ### Prerequisites
-- Modern web browser (Chrome, Firefox, Safari, Edge)
-- Stable internet connection
-- Mobile device with GPS capabilities (recommended for drivers)
-- Valid email address for registration
 
-### Accessing the Application
-1. Open your web browser
-2. Navigate to the Agduwa application URL
-3. The system will automatically redirect based on your authentication status
+- Modern browser (Chrome, Edge, Firefox, Safari)
+- Stable internet connection
+- Device with location services (important for drivers)
+
+### Landing Page Behavior
+
+When opening the app:
+
+- The first screen shows the **Active Drivers Queue**
+- Tap **Login** to open sign-in/sign-up form
 
 ### Account Types
-- **Driver Account**: For transportation service providers
-- **Admin Account**: For system administrators (pre-configured)
+
+- **Driver account**: created through registration form, then approved by admin
+- **Admin account**: recognized by admin email (default: `agduwaadmin@gmail.com`)
 
 ## Driver Guide
 
-### Registration Process
+### 1. Registration
 
-#### Step 1: Access Registration
-1. Navigate to the application login page
-2. Click on "Register" or "Don't have an account? Register"
-3. Fill in the registration form with the following information:
-   - Full Name
-   - Email Address
-   - Password (minimum 6 characters)
-   - Plate Number (vehicle license plate)
-   - Vehicle Type/Model
-   - Phone Number (11 digits, e.g., 09123456789)
+From the login form, switch to **Register** and fill:
 
-#### Step 2: Account Verification
-- After registration, your account status will be "Pending"
-- Wait for admin approval via email notification
-- Once approved, you can log in to the system
+- Full Name
+- Email
+- Password (minimum 6 characters)
+- Plate Number
+- Vehicle
+- Phone Number (must be 11 digits)
 
-#### Step 3: Profile Setup
-After approval, complete your profile:
-- Payment Method (GCash by default)
-- Payment Number
-- Age (optional)
-- Additional contact information
+If validation fails, the app blocks submission and shows an error.
 
-### Logging In
+### 2. Account Approval
 
-#### For Approved Drivers
-1. Enter your registered email and password
-2. Click "Login"
-3. System validates credentials and redirects to driver dashboard
+- New driver accounts are created as **unverified**
+- You must wait for admin approval in the Pending list
+- Unapproved accounts cannot access the driver dashboard
 
-#### For New/Pending Drivers
-- Login attempts will show verification status
-- Contact admin if approval is delayed
+### 3. Login
 
-### Driver Dashboard Overview
+After approval:
 
-#### Main Interface Elements
-- **Welcome Message**: Displays driver name
-- **Online/Offline Toggle**: Controls availability status
-- **Ride Status**: Current activity (Waiting, In Ride, Offline)
-- **Location Status**: GPS validation (Inside/Outside Paradahan)
-- **Vehicle Information**: Plate number and vehicle type
-- **Destination Selection**: Dropdown for ride destinations
-- **Queue Information**: Position and estimated wait time
+1. Enter email and password
+2. System checks account and verification status
+3. You are redirected to driver tabs (`Home`, `Analytics`, `History`, `Profile`)
 
-#### Status Indicators
-- **Green**: Online and available
-- **Yellow**: In queue or in ride
-- **Red**: Offline or outside service area
+### 4. Home Tab (Queue and Ride Flow)
 
-### Going Online and Joining the Queue
+#### What You See
 
-#### Step 1: Enable Location Services
-1. Ensure GPS is enabled on your device
-2. Grant location permissions to the browser
-3. Verify "Inside Paradahan" status
+- Ride Status (`Offline`, `Waiting`, `In Ride`)
+- Location Status (`Inside Paradahan` / `Outside Paradahan`)
+- Vehicle info
+- Destination dropdown (from fare matrix)
+- Queue status (position, estimated wait, queue list)
 
-#### Step 2: Go Online
-1. Click the "Go Online" button
-2. System validates location
-3. Status changes to "Online"
+#### Going Online / Offline
 
-#### Step 3: Join Queue
-- System automatically adds you to the queue
-- Monitor your position in the queue
-- Wait for your turn (position 1)
+- Use **Go Online** or **Go Offline** button
+- Queue participation depends on being inside the geofenced area
 
-### Accepting and Starting Rides
+#### Queue and Turn Logic
 
-#### When It's Your Turn
-1. System displays "It's your turn! Get ready for a ride."
-2. Select destination from the dropdown menu
-3. Click "Start Ride" button
-4. Status changes to "In Ride"
+- You can start a ride only when your position is **1**
+- Select destination first, then tap **Start Ride**
 
-#### During the Ride
-- Monitor ride status in real-time
-- System tracks your location and ride progress
-- Ride automatically completes after timeout or manual completion
+#### Ride Completion Logic (Current Behavior)
 
-### Managing Ride Status
+1. Tap **Start Ride** while position is 1
+2. Exit the paradahan area to begin trip phase
+3. Return inside paradahan to complete and log the ride
 
-#### Status Types
-- **Offline**: Not available for rides
-- **Waiting**: In queue, waiting for assignment
-- **In Ride**: Currently servicing a passenger
-- **Left Queue (In Ride)**: Ride in progress
+Ride logging includes destination, estimated earnings, timestamps, and wait/travel time values tracked by the app.
 
-#### Automatic Status Changes
-- Leaving queue → "In Ride" (1-minute timer starts)
-- Timer expires → Automatically "Offline"
-- Manual status changes via dashboard buttons
+### 5. History Tab
 
-### Viewing Ride History
+Shows your ride records with:
 
-#### Accessing History
-1. Navigate to "History" tab
-2. View completed rides with details:
-   - Date and time
-   - Destination
-   - Fare earned
-   - Ride status
+- Destination
+- Ended date/time
+- Estimated distance and duration
+- Earnings
 
-#### History Features
-- Chronological ordering (newest first)
-- Filter options available
-- Earnings summary
+Available filters:
 
-### Profile Management
+- Quick date presets (`Today`, `Last 7 Days`, `This Month`, `All Time`)
+- Start date / End date
+- Dropoff location text match
+- Minimum fare
 
-#### Editing Profile Information
-1. Go to "Profile" tab
-2. Update personal information:
-   - Name, contact details
-   - Vehicle information
-   - Payment method and number
-3. Save changes
+### 6. Analytics Tab
 
-#### Password Reset
-- Request password reset via admin
-- Or contact system administrator
+Current driver analytics include:
 
-### Earnings and Analytics
+- 7-day weather forecast cards
+- Alert message for rainy/storm forecasts
+- Avg wait time gauge
+- Rides today gauge
+- Earnings overview gauge
+- Top drop-off list
+- 7-day rides/earnings trend chart
+- Ride and earnings breakdown (weekly, monthly, annually, custom filter modal)
 
-#### Viewing Personal Analytics
-1. Access "Analytics" tab
-2. View performance metrics:
-   - Total rides completed
-   - Earnings summary
-   - Ride frequency
-   - Performance trends
+Custom filter modal supports:
 
-#### Fare Calculation
-- System uses predefined fare matrix
-- Fares based on destination selection
-- Automatic calculation and recording
+- Date range
+- Quick presets
+- Month and year selection
+
+### 7. Profile Tab
+
+Profile supports:
+
+- Edit mode for age, contact, payment method, payment number, and image
+- Status toggle in edit mode (for profile status field)
+- Profile QR code that links to public driver profile route: `/driver/{driverId}`
+- Public profile data sync to `publicProfiles`
+- Logout
 
 ## Admin Guide
 
-### Admin Access
+### 1. Admin Access
 
-#### Login Process
-1. Use designated admin email (agduwaadmin@gmail.com)
-2. Enter admin password
-3. System automatically redirects to admin dashboard
+- Login with admin email account (default configured admin email: `agduwaadmin@gmail.com`)
+- Non-admin users are redirected away from `/admin`
 
-#### Admin Privileges
-- Full driver management
-- Queue manipulation
-- System analytics access
-- User verification control
-- Activity logging
+### 2. Admin Layout
 
-### Admin Dashboard Overview
+Admin view has a sidebar and sections:
 
-#### Main Navigation Tabs
-- **Drivers**: Manage verified drivers
-- **Queue**: Control driver queue
-- **Status**: View driver status overview
-- **Logs**: Admin activity history
-- **History**: Driver registration history
-- **Pending**: Registration approvals
-- **Analytics**: System-wide performance metrics
+- Analytics
+- Drivers
+- Queue
+- Status
+- Logs
+- History
+- Pending
 
-### Driver Management
+### 3. Drivers Section
 
-#### Viewing All Drivers
-1. Click "Drivers" tab
-2. Search by name or plate number
-3. View driver details in table format:
-   - Name, plate, status, email
-   - Action buttons for each driver
+Features:
 
-#### Driver Actions
-- **Edit**: Modify driver information
-- **Delete**: Remove driver from system
-- **Reset Password**: Send password reset email
-- **Add to Queue**: Manually add driver to queue
-- **Remove from Queue**: Manually remove driver from queue
+- Search by name or plate
+- View status and email
+- **Edit** driver details (modal)
+- **Delete** driver
+- **Reset** password (sends reset email)
+- **Add to Queue** / **Remove from Queue**
 
-#### Editing Driver Information
-1. Click "Edit" button for selected driver
-2. Modify fields in the modal:
-   - Personal information
-   - Vehicle details
-   - Contact information
-   - Verification status
-3. Save changes
+### 4. Queue Section
 
-### Queue Management
+Features:
 
-#### Viewing Current Queue
-1. Click "Queue" tab
-2. See ordered list of drivers in queue
-3. Each entry shows:
-   - Driver name and plate
-   - Current status
-   - Position in queue
+- View current queue order
+- Drag-and-drop reorder
+- Remove driver from queue
+- Queue entry display includes capacity label (`6 passengers`)
 
-#### Manual Queue Operations
-- **Reorder Queue**: Drag and drop to change positions
-- **Remove Driver**: Manually remove from queue
-- **Add Driver**: Manually add offline driver to queue
+### 5. Status Section
 
-### Registration Approval Process
+Grouped view:
 
-#### Reviewing Pending Requests
-1. Click "Pending" tab
-2. View pending driver registrations
-3. Review application details:
-   - Personal information
-   - Vehicle details
-   - Contact information
+- **In Queue**
+- **In Ride** (includes destination and left time)
+- **Offline**
 
-#### Approval Actions
-- **Approve**: Verify driver and grant access
-- **Reject**: Delete registration request
-- All actions are logged in admin activity logs
+### 6. Pending Section
 
-### System Analytics
+Shows unverified registrations with actions:
 
-#### Accessing Analytics
-1. Click "Analytics" tab
-2. View comprehensive system metrics
-3. Filter by time periods:
-   - Daily, Weekly, Monthly, Annually
-   - Custom date ranges
+- **Approve**: sets `verified: true`
+- **Reject**: deletes pending driver record
 
-#### Analytics Features
-- **Overall Statistics**: Pie chart of driver earnings
-- **Driver Performance**: Individual driver metrics
-- **Total Rides**: System-wide ride count
-- **Total Earnings**: Combined earnings summary
-- **Performance Rankings**: Drivers sorted by earnings
+### 7. History Section
 
-#### Custom Filtering
-1. Click "Custom" filter button
-2. Select date range
-3. Apply filters to view specific periods
+Includes:
 
-### Activity Logging
+- Driver registration list and registration timestamp
+- Destination history table from `ride_logs`
+- Filters by driver name, plate, and start/end date
+- Delete action for individual ride records
 
-#### Viewing Admin Logs
-1. Click "Logs" tab
-2. See chronological activity history
-3. Each log entry includes:
-   - Admin email
-   - Action performed
-   - Timestamp
+### 8. Logs Section
 
-#### Logged Actions
-- Driver approvals/rejections
-- Queue modifications
-- Password resets
-- Driver edits/deletions
+Shows admin activity logs with:
 
-### Driver History
+- Action text
+- Date/time
 
-#### Registration History
-1. Click "History" tab
-2. View all driver registrations
-3. See registration timestamps
-4. Access destination history
+### 9. Analytics Section
 
-#### Destination History
-- Click "View Destination History" button
-- See chronological ride records
-- Filter by driver or date
-- Export options available
+Current admin analytics provide:
+
+- Weekly, Monthly, Annually, and Custom range filters
+- Ride volume report cards (total rides, peak hour, busiest day, average rides/hour)
+- Ride volume heatmap
+- Top drop-off locations chart
+
+## Current System Rules
+
+These rules reflect current code behavior:
+
+1. Drivers must be verified by admin before full access.
+2. Driver queue behavior is geofence-aware (inside paradahan required for active queue flow).
+3. A ride starts from queue position 1 after destination selection.
+4. Ride completion/logging occurs when driver returns inside paradahan after leaving.
+5. Admin queue-status logic marks drivers who leave queue as `in ride`, and can auto-mark `offline` after 1 minute if still out of queue.
+6. Public driver profile is accessible via QR link (`/driver/{driverId}`).
 
 ## Troubleshooting
 
-### Common Driver Issues
+### Driver Issues
 
-#### Location Not Detected
-**Problem**: "Outside Paradahan" status
-**Solutions**:
-1. Enable GPS on device
-2. Grant browser location permissions
-3. Ensure you're within service area
-4. Refresh the page
+#### Cannot Access Dashboard
 
-#### Cannot Go Online
-**Problem**: "Go Online" button disabled
-**Solutions**:
-1. Verify location status
-2. Check internet connection
-3. Ensure account is verified
-4. Contact admin if issues persist
+- Confirm account was approved by admin
+- Verify correct email/password
 
-#### Queue Not Updating
-**Problem**: Position not changing
-**Solutions**:
-1. Refresh the page
-2. Check internet connection
-3. Verify online status
-4. Contact admin for queue issues
+#### Location Errors
 
-#### Ride Not Starting
-**Problem**: "Start Ride" button not working
-**Solutions**:
-1. Ensure you're position 1 in queue
-2. Select a destination
-3. Check internet connection
-4. Try refreshing the page
+- Enable GPS/location services
+- Allow browser location permission
+- Move into geofenced area for queue actions
 
-### Common Admin Issues
+#### Cannot Start Ride
 
-#### Cannot Access Admin Panel
-**Problem**: Redirected to driver dashboard
-**Solutions**:
-1. Verify admin email address
-2. Check account permissions
-3. Contact system administrator
+- Ensure you are position **1** in queue
+- Ensure destination is selected
+- Confirm location is available
 
-#### Analytics Not Loading
-**Problem**: Analytics tab shows no data
-**Solutions**:
-1. Check internet connection
-2. Verify Firebase connection
-3. Refresh the page
-4. Check date range filters
+#### No Ride History Appears
 
-#### Driver Status Not Updating
-**Problem**: Manual status changes not reflecting
-**Solutions**:
-1. Check Firestore permissions
-2. Verify internet connection
-3. Try again after a few seconds
-4. Check browser console for errors
+- Confirm you are logged in with the same driver account that completed rides
+- Trigger a refresh or reopen History tab
 
-### Technical Issues
+### Admin Issues
 
-#### Page Not Loading
-**Solutions**:
-1. Clear browser cache
-2. Try different browser
-3. Check internet connection
-4. Contact technical support
+#### Admin Page Redirects Away
 
-#### Authentication Errors
-**Problem**: Login failures
-**Solutions**:
-1. Verify email and password
-2. Check account verification status
-3. Reset password if needed
-4. Contact admin for account issues
+- Confirm logged-in email matches configured admin email
 
-#### GPS/Location Errors
-**Problem**: Location services not working
-**Solutions**:
-1. Enable device GPS
-2. Grant browser permissions
-3. Try different device/browser
-4. Check location settings
+#### Pending Requests Not Showing
+
+- Check `drivers` records with `verified: false`
+- Confirm Firestore read permissions and connectivity
+
+#### Queue Reorder Fails
+
+- Check Firestore write permissions
+- Retry after refresh
+
+#### Analytics Looks Empty
+
+- Confirm there are records in `ride_logs`
+- Try switching filter range
 
 ## Frequently Asked Questions
 
-### General Questions
+### Q1: Is this a mobile app APK?
+A: No. This project is implemented and deployed as a web app.
 
-**Q: What is Agduwa?**
-A: Agduwa is a ride-hailing application designed for transportation services in the Paradahan area, connecting drivers with passengers through an efficient queue-based system.
+### Q2: How does a ride get logged?
+A: Driver starts ride at queue position 1, exits paradahan, then re-enters paradahan. The system records the ride in `ride_logs`.
 
-**Q: How does the queue system work?**
-A: Drivers go online and join a queue. When a ride request comes in, the driver at position 1 gets assigned. The system ensures fair distribution of rides among available drivers.
+### Q3: Can users view driver info without login?
+A: Yes. Public driver profile is available through QR link (`/driver/{driverId}`).
 
-**Q: What areas does Agduwa serve?**
-A: Currently, Agduwa serves the Paradahan area. GPS validation ensures drivers are within the designated service zone.
+### Q4: Can admin manually control queue?
+A: Yes. Admin can add/remove drivers and reorder queue via drag-and-drop.
 
-**Q: How are fares calculated?**
-A: Fares are calculated using a predefined fare matrix based on destination. The system automatically computes fares when drivers select their destination.
-
-### Driver Questions
-
-**Q: How long does account verification take?**
-A: Account verification is typically processed within 24 hours. You'll receive a notification once approved.
-
-**Q: Can I work from multiple devices?**
-A: Yes, but it's recommended to use one device at a time to avoid status conflicts.
-
-**Q: What happens if I lose internet connection during a ride?**
-A: The system will attempt to reconnect. If connection is lost for too long, the ride may timeout and status will change accordingly.
-
-**Q: How do I update my vehicle information?**
-A: Contact your admin or use the profile editing feature if available.
-
-**Q: Can I see my earnings in real-time?**
-A: Yes, through the Analytics tab, you can view your ride history and earnings summary.
-
-### Admin Questions
-
-**Q: How do I add new drivers to the system?**
-A: Drivers register through the app. You approve their registration in the "Pending" tab of the admin dashboard.
-
-**Q: Can I manually assign rides to specific drivers?**
-A: Yes, through queue management, you can reorder the queue or manually add/remove drivers.
-
-**Q: How do I view system performance?**
-A: Use the Analytics tab to view comprehensive metrics including driver performance, total rides, and earnings.
-
-**Q: What should I do if a driver reports issues?**
-A: Check their status in the admin panel, verify their location, and use the edit function to update their information if needed.
-
-**Q: How do I reset a driver's password?**
-A: Use the "Reset Password" button in the Drivers tab, which sends a password reset email to the driver.
-
-### Technical Questions
-
-**Q: What browsers are supported?**
-A: Modern browsers including Chrome, Firefox, Safari, and Edge are fully supported.
-
-**Q: Do I need a smartphone to use Agduwa?**
-A: While a smartphone with GPS is recommended for drivers, the system works on any device with a modern web browser.
-
-**Q: Is my data secure?**
-A: Yes, Agduwa uses Firebase authentication and encrypted data storage to protect user information.
-
-**Q: Can I export ride data?**
-A: Currently, data can be viewed in the admin dashboard. Export functionality may be added in future updates.
-
-**Q: What if I encounter a bug?**
-A: Report the issue to the system administrator with details about what you were doing when the error occurred.
+### Q5: Can admin remove incorrect ride records?
+A: Yes. In Admin > History > Destination History, each ride entry has a Delete action.
 
 ---
 
-*For technical support or additional questions, please contact the system administrator.*
+For support, contact your system administrator.
 
-*Last updated: [Current Date]*
-*Version: 1.0*
+Last updated: **April 8, 2026**
+Version: **2.0**
