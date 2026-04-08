@@ -1,46 +1,74 @@
-# Getting Started with Create React App
+# Agduwa
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Agduwa is a web-based ride-hailing and queue management system built with React, TypeScript, Vite, Firebase, and Tailwind CSS.
 
-## Available Scripts
+## Installation Guide
 
-In the project directory, you can run:
+### 1. Prerequisites
 
-### `npm start`
+- Node.js 18+ (Node.js 20 LTS recommended)
+- npm (comes with Node.js)
+- A Firebase project (Auth, Firestore, Realtime Database, Storage, Analytics)
+- An OpenCage API key (for reverse geocoding)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### 2. Clone and install dependencies
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```bash
+git clone <your-repo-url>
+cd agduwa
+npm install
+```
 
-### `npm test`
+### 3. Create environment variables
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Create a `.env` file in the project root:
 
-### `npm run build`
+```env
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.<region>.firebasedatabase.app
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+VITE_ADMIN_EMAIL=admin@example.com
+VITE_OPENCAGE_API_KEY=your_opencage_api_key
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 4. Run in development
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+npm run dev
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Open the local URL shown by Vite (usually `http://localhost:5173`).
 
-### `npm run eject`
+### 5. Build for production
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+npm run build
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Production output is generated in the `dist/` directory.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### 6. Preview production build locally
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+```bash
+npm run preview
+```
 
-## Learn More
+## Deployment Notes
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- This repository includes `vercel.json` for SPA routing rewrites.
+- Add the same `VITE_...` environment variables in your hosting provider (for example, Vercel project settings).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Why We Do Not Need an APK
+
+This repository is a web application, not a native Android project.
+
+- It runs in a browser and is deployable as a website.
+- There is no Android build setup in this codebase (`android/`, Gradle files, `AndroidManifest.xml`, Capacitor/Cordova config).
+- One web deployment supports desktop and mobile browsers without maintaining a separate Android binary.
+
+An APK is only needed if you want native Android packaging or distribution (for example, Play Store release). For the current architecture and deployment flow, it is not required.
