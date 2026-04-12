@@ -685,6 +685,8 @@ const Admin = () => {
   // Remove driver from queue
   const removeFromQueue = async (id: string) => {
     try {
+      // Manual removal from queue means the driver is taken offline.
+      await setDoc(doc(db, "drivers", id), { status: "offline" }, { merge: true });
       await deleteDoc(doc(db, "queues", id));
       toast.success("Driver removed from queue");
       // Log the action
@@ -816,6 +818,10 @@ const Admin = () => {
     try {
       const user = auth.currentUser;
       if (user) {
+        // Set status to offline first so status views update immediately.
+        const driverRef = doc(db, "drivers", user.uid);
+        await setDoc(driverRef, { status: "offline" }, { merge: true });
+
         // Remove from queue if present
         const queueRef = doc(db, "queues", user.uid);
         try {
@@ -823,9 +829,6 @@ const Admin = () => {
         } catch (error) {
           // Ignore if not in queue
         }
-        // Set status to offline
-        const driverRef = doc(db, "drivers", user.uid);
-        await setDoc(driverRef, { status: "offline" }, { merge: true });
       }
       await signOut(auth);
       toast.success("Logged out");

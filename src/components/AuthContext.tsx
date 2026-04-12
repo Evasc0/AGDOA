@@ -89,6 +89,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     const currentUser = auth.currentUser;
     if (currentUser) {
+      // Set offline first so admin status does not briefly show "in ride".
+      const driverRef = doc(db, "drivers", currentUser.uid);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
+
       // Remove from queue if present
       const queueRef = doc(db, "queues", currentUser.uid);
       try {
@@ -96,9 +100,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (error) {
         // Ignore if not in queue
       }
-      // Set status to offline
-      const driverRef = doc(db, "drivers", currentUser.uid);
-      await setDoc(driverRef, { status: "offline" }, { merge: true });
     }
     await signOut(auth);
     setUser (null);

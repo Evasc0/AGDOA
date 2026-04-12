@@ -63,6 +63,10 @@ const Profile = () => {
     setIsLoggingOut(true);
     setTimeout(async () => {
       if (!user) return;
+      // Set status to offline first so admin sees it immediately
+      const driverRef = doc(db, "drivers", user.uid);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
+
       // Remove from queue if present
       const queueRef = doc(db, "queues", user.uid);
       try {
@@ -70,9 +74,6 @@ const Profile = () => {
       } catch (error) {
         // Ignore if not in queue
       }
-      // Set status to offline
-      const driverRef = doc(db, "drivers", user.uid);
-      await setDoc(driverRef, { status: "offline" }, { merge: true });
 
       await logout?.();
       localStorage.removeItem("driver");
@@ -140,13 +141,18 @@ const Profile = () => {
         });
         toast.success("You are now online!");
       } else {
+        // Persist offline status first to avoid temporary "in ride" in admin status.
+        const driverRef = doc(db, "drivers", user.uid);
+        await setDoc(driverRef, { status: "offline" }, { merge: true });
         await goOffline(user.uid);
         toast.success("You are now offline.");
       }
 
-      // Update status in drivers collection
-      const driverRef = doc(db, "drivers", user.uid);
-      await setDoc(driverRef, { status: newStatus.toLowerCase() }, { merge: true });
+      if (newStatus === "Online") {
+        // Keep "online" path behavior unchanged.
+        const driverRef = doc(db, "drivers", user.uid);
+        await setDoc(driverRef, { status: "online" }, { merge: true });
+      }
 
     } catch (error) {
       console.error("Failed to update status:", error);

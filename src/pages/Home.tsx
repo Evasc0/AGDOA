@@ -77,6 +77,10 @@ const Home = () => {
   const handleLogout = async () => {
     if (!driver) return;
     try {
+      // Set status to offline first so admin status reflects immediately
+      const driverRef = doc(db, "drivers", driver.id);
+      await setDoc(driverRef, { status: "offline" }, { merge: true });
+
       // Remove from queue if present
       const queueRef = doc(db, "queues", driver.id);
       try {
@@ -84,9 +88,6 @@ const Home = () => {
       } catch (error) {
         // Ignore if not in queue
       }
-      // Set status to offline
-      const driverRef = doc(db, "drivers", driver.id);
-      await setDoc(driverRef, { status: "offline" }, { merge: true });
 
       await signOut(auth);
       localStorage.removeItem("driver");

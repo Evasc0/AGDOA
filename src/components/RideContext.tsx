@@ -338,9 +338,9 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!driver) return;
     const driverStatusRef = doc(db, "drivers", driver.id);
     try {
-      await deleteDoc(doc(db, "queues", driver.id));
       // Update driver status to "offline"
       await setDoc(driverStatusRef, { status: "offline" }, { merge: true });
+      await deleteDoc(doc(db, "queues", driver.id));
 
       setHasJoined(false);
       setPosition(null);
