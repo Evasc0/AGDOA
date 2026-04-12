@@ -23,9 +23,7 @@ import NotFound from "./pages/NotFound";
 import { Toaster, toast } from "react-hot-toast";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { RideProvider } from "./components/RideContext";
-
-// Unified admin email constant
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || "agduwaadmin@gmail.com").trim().toLowerCase();
+import { ensureUserRoleDocument, isAdminEmail } from "./utils/admin";
 
 const App = () => {
   const [user, setUser ] = useState<any>(null);
@@ -41,11 +39,17 @@ const App = () => {
         setUser (firebaseUser );
 
         const email = firebaseUser .email?.trim().toLowerCase() || "";
-        console.log("ADMIN_EMAIL:", ADMIN_EMAIL);
         console.log("Logged in user email:", email);
 
-        const isAdminUser  = email === ADMIN_EMAIL;
+        const isAdminUser  = isAdminEmail(email);
         console.log("Is admin user:", isAdminUser );
+
+        // Keep role documents synchronized for both drivers and admins.
+        try {
+          await ensureUserRoleDocument({ uid: firebaseUser.uid, email });
+        } catch (roleError) {
+          console.error("Error syncing user role document:", roleError);
+        }
 
         if (isAdminUser ) {
           // Admin user: log access and mark verified
@@ -264,7 +268,7 @@ const App = () => {
   }
 
   const isAuthenticated = !!user && verified === true && !postLoginLoading;
-  const isAdmin = user?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+  const isAdmin = isAdminEmail(user?.email ?? null);
 
   return (
     <RideProvider>

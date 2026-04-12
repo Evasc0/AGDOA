@@ -1,8 +1,7 @@
 import { useAdminGuard } from "../hooks/useAdminGuard";
 import { useAuth } from "../components/AuthContext";
 import { Navigate } from "react-router-dom";
-
-const ADMIN_EMAIL = "agduwaadmin@gmail.com";
+import { isAdminEmail } from "../utils/admin";
 
 const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { loading, user } = useAuth();
@@ -18,7 +17,7 @@ const ProtectedAdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // If no user or user is not admin, redirect to login or home
-  if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  if (!user || !isAdminEmail(user.email)) {
     return <Navigate to="/" replace />;
   }
 

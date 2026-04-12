@@ -56,6 +56,9 @@ const EditDriverModal = ({ driver, onClose, onSaveSuccess, user }: EditDriverMod
 
   const handleUpdate = async () => {
     if (!validateFields()) return;
+    if (!window.confirm("Are you sure you want to save these driver details?")) {
+      return;
+    }
 
     try {
       setLoading(true);

@@ -8,7 +8,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, setDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { ensureUserRoleDocument, isAdminEmail } from "../utils/admin";
 
 interface AuthContextType {
   user: User | null;
@@ -37,7 +37,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const loginResult = await signInWithEmailAndPassword(auth, email, password);
+    // Keep role metadata synchronized right after authentication.
+    try {
+      await ensureUserRoleDocument({ uid: loginResult.user.uid, email: loginResult.user.email });
+    } catch (roleSyncError) {
+      console.error("Role sync failed during login:", roleSyncError);
+    }
     // Removed navigate here to let App.tsx handle redirects
   };
 
@@ -51,9 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const uid = userCredential.user.uid;
 
     // Check if user is admin
-    const isAdmin = ["agduwaadmin@gmail.com"].some(
-      (adminEmail) => adminEmail.toLowerCase() === email.toLowerCase()
-    );
+    const isAdmin = isAdminEmail(email);
 
     // Create driver record with proper verification status
     const driverRef = doc(db, "drivers", uid);
@@ -73,6 +77,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       createdAt: serverTimestamp(),
       verified: isAdmin, // admins auto verified, others false
     });
+    try {
+      await ensureUserRoleDocument({ uid, email });
+    } catch (roleSyncError) {
+      console.error("Role sync failed during sign-up:", roleSyncError);
+    }
 
     // Removed navigate here to let App.tsx handle redirects
   };

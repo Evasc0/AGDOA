@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../components/AuthContext';
@@ -17,8 +17,8 @@ import {
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import ApexCharts from 'apexcharts';
 import ReactApexChart from 'react-apexcharts';
-import { fareMatrix } from '../utils/fareMatrix';
 import AnalyticsFilterModal from '../components/AnalyticsFilterModal';
+import { useFareRates } from "../hooks/useFareRates";
 
 // Register Chart.js components
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler);
@@ -47,6 +47,14 @@ const normalizeKey = (key: string) => key.trim().toLowerCase();
 
 const Analytics: React.FC = () => {
   const { user } = useAuth();
+  const { fareRates } = useFareRates();
+  const normalizedFareLookup = useMemo(() => {
+    const normalized: Record<string, number> = {};
+    Object.entries(fareRates).forEach(([routeName, routeFare]) => {
+      normalized[normalizeKey(routeName)] = routeFare;
+    });
+    return normalized;
+  }, [fareRates]);
 
   const [forecast, setForecast] = useState<WeatherData[]>([]);
   const [avgWaitTime, setAvgWaitTime] = useState(0);
@@ -145,12 +153,7 @@ const Analytics: React.FC = () => {
       const dropoffNameRaw = data.dropoffName || "";
       const dropoffName = dropoffNameRaw.trim();
 
-      const normalizedFareMatrix: Record<string, number> = {};
-      Object.entries(fareMatrix).forEach(([key, val]) => {
-        normalizedFareMatrix[normalizeKey(key)] = val;
-      });
-
-      const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+      const fare = normalizedFareLookup[normalizeKey(dropoffName)] || 0;
 
       totalEarnings += fare; // Accumulate total earnings for the last 7 days
 
@@ -220,7 +223,7 @@ const Analytics: React.FC = () => {
     console.error("Error loading analytics:", err);
   }
   setRefreshing(false);
-}, [user]);
+}, [user, normalizedFareLookup]);
 
   // Fetch data for pie chart based on filter
   const fetchPie = useCallback(async (selectedFilter: 'weekly' | 'monthly' | 'annually', customStart?: Date | null, customEnd?: Date | null) => {
@@ -272,12 +275,7 @@ const Analytics: React.FC = () => {
         const dropoffNameRaw = data.dropoffName || "";
         const dropoffName = dropoffNameRaw.trim();
 
-        const normalizedFareMatrix: Record<string, number> = {};
-        Object.entries(fareMatrix).forEach(([key, val]) => {
-          normalizedFareMatrix[normalizeKey(key)] = val;
-        });
-
-        const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+        const fare = normalizedFareLookup[normalizeKey(dropoffName)] || 0;
 
         const dayLabel = ts.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
         if (statMap[dayLabel]) {
@@ -333,7 +331,7 @@ const Analytics: React.FC = () => {
     } catch (err) {
       console.error("Error loading pie analytics:", err);
     }
-  }, [user]);
+  }, [user, normalizedFareLookup]);
 
   useEffect(() => {
     if (user) {

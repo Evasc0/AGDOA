@@ -1,31 +1,32 @@
+import { useMemo } from "react";
 import { X } from "lucide-react";
 import { db, auth } from "../firebase";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { fareMatrix } from "../utils/fareMatrix";
 import { useRide } from "../components/RideContext";
+import { useFareRates } from "../hooks/useFareRates";
 
 const AVERAGE_WAIT_TIME_PER_DRIVER = 20; // in minutes
 
 // Helper function to generate destination options sorted by fare
-const getSortedDestinations = (): { location: string; fare: number; tripType: string; displayText: string }[] => {
-  const locations = Object.keys(fareMatrix);
+const getSortedDestinations = (
+  fareRates: Record<string, number>
+): { location: string; fare: number; tripType: string; displayText: string }[] => {
+  const locations = Object.keys(fareRates);
   return locations
-    .sort((a, b) => fareMatrix[a] - fareMatrix[b])
+    .sort((a, b) => fareRates[a] - fareRates[b])
     .map((location) => {
-      const fare = fareMatrix[location];
+      const fare = fareRates[location];
       const tripType = fare >= 500 ? "LT" : "ST";
       const displayText = `${tripType} ${location} ₱${fare}`;
       return { location, fare, tripType, displayText };
     });
 };
-
-const sortedDestinations = getSortedDestinations();
-
 const Home = () => {
   const navigate = useNavigate();
+  const { fareRates } = useFareRates();
   const {
     driver,
     isOnline,
@@ -46,6 +47,31 @@ const Home = () => {
     gpsError,
     toastMsg,
   } = useRide();
+  const sortedDestinations = useMemo(
+    () => getSortedDestinations(fareRates),
+    [fareRates]
+  );
+
+  const handleGoOutClick = async () => {
+    if (!window.confirm("Are you sure you want to go OUT and leave the queue?")) {
+      return;
+    }
+    await handleGoOffline();
+  };
+
+  const handleGoInClick = async () => {
+    if (!window.confirm("Are you sure you want to go IN and join the queue?")) {
+      return;
+    }
+    await handleGoOnlineAgain();
+  };
+
+  const handleStartRideClick = async () => {
+    if (!window.confirm("Are you sure you want to leave the queue and start this trip?")) {
+      return;
+    }
+    await handleStartRide();
+  };
 
   // Logout: Set status to offline, remove from queue, sign out, navigate to login
   const handleLogout = async () => {
@@ -82,14 +108,14 @@ const Home = () => {
               <h2 className="text-xl font-bold animate-slide-down">Welcome, {driver?.name ?? "Driver"}</h2>
               {isOnline ? (
                 <button
-                  onClick={handleGoOffline}
+                  onClick={handleGoOutClick}
                   className="px-4 py-2 text-sm rounded-full font-semibold bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   Go Offline
                 </button>
               ) : (
                 <button
-                  onClick={handleGoOnlineAgain}
+                  onClick={handleGoInClick}
                   className="px-4 py-2 text-sm rounded-full font-semibold bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg transition-all duration-300 transform hover:scale-105"
                 >
                   Go Online
@@ -222,7 +248,7 @@ const Home = () => {
             {/* Start Ride Button */}
             {position === 1 && !rideStarted && (
               <button
-                onClick={handleStartRide}
+                onClick={handleStartRideClick}
                 disabled={!selectedDestination}
                 className="w-full py-3 px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
@@ -247,3 +273,4 @@ const Home = () => {
 };
 
 export default Home;
+

@@ -5,6 +5,7 @@ import {
   onSnapshot,
   doc,
   deleteDoc,
+  deleteField,
   setDoc,
   getDoc,
   serverTimestamp,
@@ -49,9 +50,16 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import zoomPlugin from 'chartjs-plugin-zoom';
-import { fareMatrix } from '../utils/fareMatrix';
+import {
+  DEFAULT_BASE_FARE,
+  FARE_SETTINGS_COLLECTION,
+  FARE_SETTINGS_DOCUMENT,
+  getDefaultRouteFares,
+  normalizeBaseFare,
+  normalizeRouteFares,
+} from "../utils/fareRates";
 import { haversineDistance } from '../utils/haversine';
-import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut } from 'lucide-react';
+import { Users, ListOrdered, Activity, FileText, History, AlertCircle, BarChart3, LogOut, Banknote } from 'lucide-react';
 import ApexCharts from 'apexcharts';
 import ReactApexChart from 'react-apexcharts';
 
@@ -65,13 +73,25 @@ interface Driver {
   name: string;
   plate: string;
   email: string;
-  status: "online" | "offline" | "in ride" | "waiting";
+  status: "online" | "offline" | "in ride" | "waiting" | "archived";
   createdAt?: any;
   verified?: boolean;
   phone?: string;
   leftAt?: any;
+  archivedAt?: any;
+  archivedBy?: string;
   selectedDestination?: string;
 }
+
+type ZoomedSection =
+  | "analytics"
+  | "drivers"
+  | "queue"
+  | "status"
+  | "logs"
+  | "history"
+  | "pending"
+  | "fareRates";
 
 interface QueueEntry {
   driverId: string;
@@ -118,6 +138,13 @@ const SortableItem = ({ id, name, plate, onRemove }: any) => {
 };
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
+const buildNormalizedFareLookup = (source: Record<string, number>) => {
+  const normalized: Record<string, number> = {};
+  Object.entries(source).forEach(([key, value]) => {
+    normalized[normalizeKey(key)] = value;
+  });
+  return normalized;
+};
 const toLocalDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -225,11 +252,12 @@ const Admin = () => {
 
   const [user, setUser ] = useState<any>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [archivedDrivers, setArchivedDrivers] = useState<Driver[]>([]);
   const [pendingDrivers, setPendingDrivers] = useState<Driver[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
-  const [zoomedSection, setZoomedSection] = useState<"analytics" | "drivers" | "queue" | "status" | "logs" | "history" | "pending" | null>(null);
+  const [zoomedSection, setZoomedSection] = useState<ZoomedSection | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
@@ -265,6 +293,12 @@ const Admin = () => {
   const [historySearchPlate, setHistorySearchPlate] = useState("");
   const [historyStartDate, setHistoryStartDate] = useState<Date | null>(null);
   const [historyEndDate, setHistoryEndDate] = useState<Date | null>(null);
+  const [fareRates, setFareRates] = useState<Record<string, number>>(getDefaultRouteFares());
+  const [fareBaseFare, setFareBaseFare] = useState<number>(DEFAULT_BASE_FARE);
+  const [fareRateDraft, setFareRateDraft] = useState<Record<string, string>>({});
+  const [baseFareDraft, setBaseFareDraft] = useState<string>(DEFAULT_BASE_FARE.toString());
+  const [fareEditMode, setFareEditMode] = useState(false);
+  const [savingFareRates, setSavingFareRates] = useState(false);
 
   // Update isMobile on window resize
   useEffect(() => {
@@ -308,6 +342,38 @@ const Admin = () => {
     return () => unsubscribeAuth();
   }, [auth, navigate]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const fareSettingsRef = doc(db, FARE_SETTINGS_COLLECTION, FARE_SETTINGS_DOCUMENT);
+    const unsubscribeFareSettings = onSnapshot(
+      fareSettingsRef,
+      (snapshot) => {
+        const storedData = snapshot.exists() ? snapshot.data() : null;
+        const resolvedFareRates = normalizeRouteFares(storedData?.routeFares);
+        const resolvedBaseFare = normalizeBaseFare(storedData?.baseFare);
+
+        setFareRates(resolvedFareRates);
+        setFareBaseFare(resolvedBaseFare);
+
+        // Keep form drafts synchronized with real-time data when not actively editing.
+        if (!fareEditMode) {
+          const nextDraft: Record<string, string> = {};
+          Object.entries(resolvedFareRates).forEach(([routeName, routeFare]) => {
+            nextDraft[routeName] = routeFare.toString();
+          });
+          setFareRateDraft(nextDraft);
+          setBaseFareDraft(resolvedBaseFare.toString());
+        }
+      },
+      (error) => {
+        toast.error("Failed to load fare rates: " + error.message);
+      }
+    );
+
+    return () => unsubscribeFareSettings();
+  }, [db, user, fareEditMode]);
+
   // Fetch drivers, pending drivers, logs, and handle queue with status logic
   useEffect(() => {
     if (!user) return;
@@ -332,13 +398,21 @@ const Admin = () => {
           createdAt: d.createdAt
         })));
 
-        const verifiedDrivers = allDrivers.filter((d) => d.verified === true);
+        // Archived drivers are kept in Firestore but hidden from active management lists.
+        const verifiedDrivers = allDrivers.filter(
+          (d) => d.verified === true && d.status !== "archived"
+        );
+        // Archived drivers remain queryable for recovery in Driver Management.
+        const archived = allDrivers.filter(
+          (d) => d.verified === true && d.status === "archived"
+        );
         const pending = allDrivers.filter((d) => d.verified === false);
 
         console.log("✅ Verified drivers:", verifiedDrivers.length, verifiedDrivers.map(d => ({ id: d.id, name: d.name, verified: d.verified })));
         console.log("⏳ Pending drivers:", pending.length, pending.map(d => ({ id: d.id, name: d.name, verified: d.verified })));
 
         setDrivers(verifiedDrivers);
+        setArchivedDrivers(archived);
         setPendingDrivers(pending);
 
         // Notify admin of new pending registration requests
@@ -512,20 +586,61 @@ const Admin = () => {
     }
   };
 
-  // Delete driver document
-  const handleDelete = async (id: string) => {
+  // Archive a driver account instead of deleting it.
+  const handleArchiveDriver = async (driver: Driver) => {
+    if (!window.confirm("Are you sure you want to archive this driver?")) {
+      return;
+    }
+
     try {
-      await deleteDoc(doc(db, "drivers", id));
-      toast.success("Driver deleted");
-      // Log the action
-      const driver = drivers.find(d => d.id === id);
+      // Keep queue data consistent by removing archived drivers from active queue.
+      await deleteDoc(doc(db, "queues", driver.id));
+      await setDoc(
+        doc(db, "drivers", driver.id),
+        {
+          status: "archived",
+          archivedAt: serverTimestamp(),
+          archivedBy: user?.email ?? "",
+        },
+        { merge: true }
+      );
+      toast.success(`${driver.name} archived successfully`);
       await setDoc(doc(collection(db, "adminAccessLogs")), {
         email: user?.email,
-        action: `Deleted driver: ${driver?.name} (${driver?.plate})`,
+        action: `Archived driver: ${driver.name} (${driver.plate})`,
         timestamp: serverTimestamp(),
       });
     } catch (error: any) {
-      toast.error("Error deleting driver");
+      toast.error("Failed to archive driver: " + error.message);
+    }
+  };
+
+  // Restore archived driver accounts back to active management.
+  const handleRecoverDriver = async (driver: Driver) => {
+    if (!window.confirm(`Are you sure you want to recover ${driver.name}?`)) {
+      return;
+    }
+
+    try {
+      await setDoc(
+        doc(db, "drivers", driver.id),
+        {
+          status: "offline",
+          archivedAt: deleteField(),
+          archivedBy: deleteField(),
+          recoveredAt: serverTimestamp(),
+          recoveredBy: user?.email ?? "",
+        },
+        { merge: true }
+      );
+      toast.success(`${driver.name} recovered successfully`);
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: `Recovered archived driver: ${driver.name} (${driver.plate})`,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error: any) {
+      toast.error("Failed to recover driver: " + error.message);
     }
   };
 
@@ -584,8 +699,103 @@ const Admin = () => {
     }
   };
 
+  const beginFareEdit = () => {
+    // Populate edit fields from the latest real-time fare values.
+    const currentDraft: Record<string, string> = {};
+    Object.entries(fareRates).forEach(([routeName, routeFare]) => {
+      currentDraft[routeName] = routeFare.toString();
+    });
+    setFareRateDraft(currentDraft);
+    setBaseFareDraft(fareBaseFare.toString());
+    setFareEditMode(true);
+  };
+
+  const cancelFareEdit = () => {
+    const currentDraft: Record<string, string> = {};
+    Object.entries(fareRates).forEach(([routeName, routeFare]) => {
+      currentDraft[routeName] = routeFare.toString();
+    });
+    setFareRateDraft(currentDraft);
+    setBaseFareDraft(fareBaseFare.toString());
+    setFareEditMode(false);
+  };
+
+  const handleFareRateDraftChange = (routeName: string, nextValue: string) => {
+    setFareRateDraft((prev) => ({
+      ...prev,
+      [routeName]: nextValue,
+    }));
+  };
+
+  const handleSaveFareRates = async () => {
+    const trimmedBaseFare = baseFareDraft.trim();
+    if (!trimmedBaseFare) {
+      toast.error("Base fare is required.");
+      return;
+    }
+
+    const parsedBaseFare = Number(trimmedBaseFare);
+    if (!Number.isFinite(parsedBaseFare) || parsedBaseFare < 0) {
+      toast.error("Base fare must be a non-negative number.");
+      return;
+    }
+
+    const nextRouteFares: Record<string, number> = {};
+    for (const routeName of Object.keys(fareRates)) {
+      const rawValue = (fareRateDraft[routeName] ?? "").trim();
+      if (!rawValue) {
+        toast.error(`Fare for ${routeName} is required.`);
+        return;
+      }
+
+      const parsedFare = Number(rawValue);
+      if (!Number.isFinite(parsedFare) || parsedFare < 0) {
+        toast.error(`Fare for ${routeName} must be a non-negative number.`);
+        return;
+      }
+
+      nextRouteFares[routeName] = parsedFare;
+    }
+
+    setSavingFareRates(true);
+    try {
+      await setDoc(
+        doc(db, FARE_SETTINGS_COLLECTION, FARE_SETTINGS_DOCUMENT),
+        {
+          baseFare: parsedBaseFare,
+          routeFares: nextRouteFares,
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.email ?? "",
+        },
+        { merge: true }
+      );
+
+      await setDoc(doc(collection(db, "adminAccessLogs")), {
+        email: user?.email,
+        action: "Updated fare rate card values",
+        timestamp: serverTimestamp(),
+      });
+
+      toast.success("Fare rates updated successfully.");
+      setFareEditMode(false);
+    } catch (error: any) {
+      toast.error("Failed to save fare rates: " + error.message);
+    } finally {
+      setSavingFareRates(false);
+    }
+  };
+
+  const sortedFareRates = Object.entries(fareRates).sort(([routeA], [routeB]) =>
+    routeA.localeCompare(routeB)
+  );
+
   // Filter drivers for search
   const filteredDrivers = drivers.filter(
+    (d) =>
+      d.name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.plate?.toLowerCase().includes(search.toLowerCase())
+  );
+  const filteredArchivedDrivers = archivedDrivers.filter(
     (d) =>
       d.name?.toLowerCase().includes(search.toLowerCase()) ||
       d.plate?.toLowerCase().includes(search.toLowerCase())
@@ -597,6 +807,7 @@ const Admin = () => {
     if (!driver) return "Offline";
     if (driver.status === "waiting") return "In Queue";
     if (driver.status === "in ride") return "Left the queue (In Ride)";
+    if (driver.status === "archived") return "Archived";
     if (driver.status === "offline") return "Offline";
     return "Offline";
   };
@@ -699,6 +910,7 @@ const Admin = () => {
       }
 
       // Calculate per-driver stats first
+      const normalizedFareRates = buildNormalizedFareLookup(fareRates);
       const driverStats: Record<string, { label: string; earnings: number; rides: number }[]> = {};
       let totalEarnings = 0;
       let totalRides = 0;
@@ -707,11 +919,7 @@ const Admin = () => {
         const driverEarnings = driverRides.reduce((sum, ride) => {
           const dropoffNameRaw = ride.dropoffName || "";
           const dropoffName = dropoffNameRaw.trim();
-          const normalizedFareMatrix: Record<string, number> = {};
-          Object.entries(fareMatrix).forEach(([key, val]) => {
-            normalizedFareMatrix[normalizeKey(key)] = val;
-          });
-          const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+          const fare = normalizedFareRates[normalizeKey(dropoffName)] || 0;
           return sum + fare;
         }, 0);
         const driverRideCount = driverRides.length;
@@ -769,11 +977,7 @@ const Admin = () => {
         }
         const dropoffNameRaw = ride.dropoffName || "";
         const dropoffName = dropoffNameRaw.trim();
-        const normalizedFareMatrix: Record<string, number> = {};
-        Object.entries(fareMatrix).forEach(([key, val]) => {
-          normalizedFareMatrix[normalizeKey(key)] = val;
-        });
-        const fare = normalizedFareMatrix[normalizeKey(dropoffName)] || 0;
+        const fare = normalizedFareRates[normalizeKey(dropoffName)] || 0;
         dateMap[dateKey][driverId].earnings += fare;
         dateMap[dateKey][driverId].rides += 1;
       });
@@ -924,7 +1128,7 @@ const Admin = () => {
     if (user) {
       fetchAnalytics();
     }
-  }, [user, analyticsFilter, analyticsStartDate, analyticsEndDate]);
+  }, [user, analyticsFilter, analyticsStartDate, analyticsEndDate, fareRates]);
 
   useEffect(() => {
     if (zoomedSection === "analytics" && user) {
@@ -991,6 +1195,7 @@ const Admin = () => {
             {[
               { type: "analytics", label: "Analytics", icon: BarChart3 },
               { type: "drivers", label: "Drivers", icon: Users },
+              { type: "fareRates", label: "Fare Rates", icon: Banknote },
               { type: "queue", label: "Queue", icon: ListOrdered },
               { type: "status", label: "Status", icon: Activity },
               { type: "logs", label: "Logs", icon: FileText },
@@ -999,7 +1204,7 @@ const Admin = () => {
             ].map(({ type, label, icon: Icon }) => (
               <div
                 key={type}
-                onClick={() => setZoomedSection(type as "analytics" | "drivers" | "queue" | "status" | "logs" | "history" | "pending")}
+                onClick={() => setZoomedSection(type as ZoomedSection)}
                 className="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors hover:bg-gray-100 cursor-pointer"
               >
                 <Icon size={20} />
@@ -1287,6 +1492,93 @@ const Admin = () => {
                 </div>
               </div>
             )}
+            {zoomedSection === "fareRates" && (
+              <div className="bg-gradient-to-br from-green-50 to-blue-100 min-h-screen p-6">
+                <div className="max-w-7xl mx-auto">
+                  <h2 className="text-3xl font-bold mb-6 text-blue-900 flex items-center gap-3">
+                    <Banknote size={32} />
+                    Fare Rate Card
+                  </h2>
+
+                  <div className="bg-white rounded-xl shadow-lg border border-blue-200 p-6">
+                    <div className="flex flex-col md:flex-row md:items-end gap-4 mb-6">
+                      <div className="w-full md:w-64">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Base Fare</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          required
+                          value={fareEditMode ? baseFareDraft : fareBaseFare}
+                          onChange={(event) => setBaseFareDraft(event.target.value)}
+                          disabled={!fareEditMode || savingFareRates}
+                          className="w-full p-3 rounded-lg bg-gray-50 border border-gray-300 text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        {!fareEditMode ? (
+                          <button
+                            onClick={beginFareEdit}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          >
+                            Edit Rates
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={cancelFareEdit}
+                              disabled={savingFareRates}
+                              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveFareRates}
+                              disabled={savingFareRates}
+                              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-60"
+                            >
+                              {savingFareRates ? "Saving..." : "Save Rates"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border border-blue-100 rounded-lg overflow-hidden">
+                        <thead className="bg-blue-50">
+                          <tr>
+                            <th className="p-3 text-left font-semibold text-blue-900">Route</th>
+                            <th className="p-3 text-left font-semibold text-blue-900">Fare</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedFareRates.map(([routeName, routeFare]) => (
+                            <tr key={routeName} className="border-t border-blue-100">
+                              <td className="p-3 text-gray-900">{routeName}</td>
+                              <td className="p-3">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  required
+                                  value={fareEditMode ? fareRateDraft[routeName] ?? "" : routeFare}
+                                  onChange={(event) =>
+                                    handleFareRateDraftChange(routeName, event.target.value)
+                                  }
+                                  disabled={!fareEditMode || savingFareRates}
+                                  className="w-full md:w-40 p-2 rounded bg-gray-50 border border-gray-300 text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {zoomedSection === "drivers" && (
               <div className="bg-gradient-to-br from-purple-50 to-purple-100 min-h-screen p-6">
                 <div className="max-w-7xl mx-auto">
@@ -1341,10 +1633,10 @@ const Admin = () => {
                                   Edit
                                 </button>
                                 <button
-                                  onClick={() => handleDelete(driver.id)}
+                                  onClick={() => handleArchiveDriver(driver)}
                                   className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
                                 >
-                                  Delete
+                                  Archive
                                 </button>
                                 <button
                                   onClick={() => resetPassword(driver.email)}
@@ -1374,6 +1666,50 @@ const Admin = () => {
                               </td>
                             </tr>
                           ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow-lg border border-purple-200 overflow-hidden mt-6">
+                    <div className="p-4 border-b border-purple-100 bg-purple-50">
+                      <h3 className="text-lg font-semibold text-purple-900">Archived Drivers</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-purple-50">
+                          <tr>
+                            <th className="p-4 text-left font-semibold text-purple-900">Name</th>
+                            <th className="p-4 text-left font-semibold text-purple-900">Plate</th>
+                            <th className="p-4 text-left font-semibold text-purple-900">Email</th>
+                            <th className="p-4 text-left font-semibold text-purple-900">Archived On</th>
+                            <th className="p-4 text-right font-semibold text-purple-900 pr-6">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredArchivedDrivers.map((driver) => (
+                            <tr key={driver.id} className="border-t border-purple-100">
+                              <td className="p-4 text-purple-900">{driver.name}</td>
+                              <td className="p-4 text-purple-900">{driver.plate}</td>
+                              <td className="p-4 text-purple-900">{driver.email}</td>
+                              <td className="p-4 text-purple-900">{formatTime(driver.archivedAt?.seconds)}</td>
+                              <td className="p-4 text-right pr-6">
+                                <button
+                                  onClick={() => handleRecoverDriver(driver)}
+                                  className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                >
+                                  Recover
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredArchivedDrivers.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="p-4 text-center text-gray-500">
+                                No archived drivers found.
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1854,6 +2190,27 @@ const Admin = () => {
                     <p className="font-bold text-red-700">{drivers.filter(d => d.status === 'offline').length}</p>
                     <p className="text-red-600">Offline</p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fare Rates - Small Card */}
+            <div
+              onClick={() => setZoomedSection("fareRates")}
+              className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-l from-green-200 to-blue-200 p-4 rounded-lg border border-blue-200 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300"
+            >
+              <h3 className="text-lg font-bold mb-2 text-blue-900 flex items-center gap-2">
+                <Banknote size={20} />
+                Fare Rate Card
+              </h3>
+              <div className="space-y-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-sm text-gray-600">Base Fare</p>
+                  <p className="text-2xl font-bold text-blue-600">{fareBaseFare}</p>
+                </div>
+                <div className="bg-white p-2 rounded shadow-sm text-xs">
+                  <p className="text-gray-700">Configured Routes: {sortedFareRates.length}</p>
+                  <p className="text-gray-500">Tap to view and edit fares.</p>
                 </div>
               </div>
             </div>

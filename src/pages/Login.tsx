@@ -1,6 +1,6 @@
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createUserWithEmailAndPassword,
@@ -18,9 +18,9 @@ import {
 import { auth, db } from "../firebase";
 import toast, { Toaster } from "react-hot-toast";
 import { query, orderBy, where } from "firebase/firestore";
+import { ensureUserRoleDocument, isAdminEmail } from "../utils/admin";
+import { useFareRates } from "../hooks/useFareRates";
 
-// Use the correct admin email here (case-insensitive check)
-const ADMIN_EMAILS = ["agduwaadmin@gmail.com"];
 const QUEUE_PASSENGER_CAPACITY = 6;
 
 interface QueueEntry {
@@ -45,8 +45,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showQueue, setShowQueue] = useState(true); // Default to showing queue
+  const [showFareMatrix, setShowFareMatrix] = useState(true);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
+  const { fareRates, baseFare, loading: fareRatesLoading } = useFareRates();
+  const sortedFareMatrix = useMemo(
+    () => Object.entries(fareRates).sort((a, b) => a[1] - b[1]),
+    [fareRates]
+  );
 
   const navigate = useNavigate();
 
@@ -146,9 +152,7 @@ const Login = () => {
         );
         const uid = userCredential.user.uid;
 
-        const isAdmin = ADMIN_EMAILS.some(
-          (adminEmail) => adminEmail.toLowerCase() === email.toLowerCase()
-        );
+        const isAdmin = isAdminEmail(email);
 
         const driverData = {
           id: uid,
@@ -168,6 +172,12 @@ const Login = () => {
         };
 
         await setDoc(doc(db, "drivers", uid), driverData);
+        // Persist role metadata so permission checks can rely on Firestore roles.
+        try {
+          await ensureUserRoleDocument({ uid, email });
+        } catch (roleSyncError) {
+          console.error("Role sync failed during sign-up:", roleSyncError);
+        }
 
         console.log("✅ Driver document created:", {
           uid,
@@ -197,11 +207,15 @@ const Login = () => {
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
-        const isAdmin = ADMIN_EMAILS.some(
-          (adminEmail) => adminEmail.toLowerCase() === email.toLowerCase()
-        );
+        const isAdmin = isAdminEmail(email);
 
         if (isAdmin) {
+          // Ensure predefined admins always have an admin role document.
+          try {
+            await ensureUserRoleDocument({ uid, email });
+          } catch (roleSyncError) {
+            console.error("Role sync failed for admin login:", roleSyncError);
+          }
           // For admin, skip profile check and redirect immediately
             const driverData = {
               id: uid,
@@ -262,6 +276,12 @@ const Login = () => {
           return;
         }
 
+        // Keep non-admin role records in sync after successful sign-in.
+        try {
+          await ensureUserRoleDocument({ uid, email });
+        } catch (roleSyncError) {
+          console.error("Role sync failed for driver login:", roleSyncError);
+        }
         localStorage.setItem("driver", JSON.stringify(driverData));
 
         toast.success("Welcome back!");
@@ -305,52 +325,99 @@ const Login = () => {
       </div>
       {showQueue ? (
         <div className="flex flex-col items-center justify-start flex-1 p-2 sm:p-4">
-          <div className="animated-gradient p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl">
-            <h1 className="text-2xl sm:text-3xl font-bold mb-5 text-center bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent">
-              Welcome to Agduwa
-            </h1>
-            <h2 className="text-xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent text-center">
-              Active Drivers Queue
-            </h2>
-            {queue.length === 0 ? (
-              <p className="text-center text-white text-base sm:text-lg py-8">No drivers online at the moment.</p>
-            ) : (
-              <div className="max-h-80 sm:max-h-96 overflow-y-auto">
-                <ul className="space-y-3">
-                  {queue.map((entry) => {
-                    const driver = drivers.find((d) => d.id === entry.driverId);
-                    const status = getDriverStatus(entry.driverId);
+          <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="animated-gradient p-6 sm:p-8 rounded-lg shadow-lg w-full">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-5 text-center bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent">
+                Welcome to Agduwa
+              </h1>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent text-center">
+                Active Drivers Queue
+              </h2>
+              {queue.length === 0 ? (
+                <p className="text-center text-white text-base sm:text-lg py-8">No drivers online at the moment.</p>
+              ) : (
+                <div className="max-h-80 sm:max-h-96 overflow-y-auto">
+                  <ul className="space-y-3">
+                    {queue.map((entry) => {
+                      const driver = drivers.find((d) => d.id === entry.driverId);
+                      const status = getDriverStatus(entry.driverId);
 
-                    return (
-                      <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900 text-sm sm:text-base">
-                            {driver?.name ?? entry.name}
+                      return (
+                        <li key={entry.driverId} className="flex justify-between items-center bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-900 text-sm sm:text-base">
+                              {driver?.name ?? entry.name}
+                            </span>
+                            <span className="text-gray-600 text-xs sm:text-sm">
+                              ({driver?.plate ?? entry.plate}) - {driver?.vehicle ?? 'N/A'}
+                            </span>
+                            <span className="text-gray-500 text-xs">
+                              Capacity: {QUEUE_PASSENGER_CAPACITY} passengers
+                            </span>
+                          </div>
+                          <span
+                            className={`text-sm sm:text-base font-medium px-2 py-1 rounded-full ${
+                              status === "In Queue"
+                                ? "text-green-700 bg-green-100"
+                                : status === "Left the queue (In Ride)"
+                                ? "text-yellow-700 bg-yellow-100"
+                                : "text-red-700 bg-red-100"
+                            }`}
+                          >
+                            {status}
                           </span>
-                          <span className="text-gray-600 text-xs sm:text-sm">
-                            ({driver?.plate ?? entry.plate}) - {driver?.vehicle ?? 'N/A'}
-                          </span>
-                          <span className="text-gray-500 text-xs">
-                            Capacity: {QUEUE_PASSENGER_CAPACITY} passengers
-                          </span>
-                        </div>
-                        <span
-                          className={`text-sm sm:text-base font-medium px-2 py-1 rounded-full ${
-                            status === "In Queue"
-                              ? "text-green-700 bg-green-100"
-                              : status === "Left the queue (In Ride)"
-                              ? "text-yellow-700 bg-yellow-100"
-                              : "text-red-700 bg-red-100"
-                          }`}
-                        >
-                          {status}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="animated-gradient p-6 sm:p-8 rounded-lg shadow-lg w-full">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold bg-gradient-to-r from-green-300 to-blue-300 bg-clip-text text-transparent">
+                  Fare Matrix
+                </h2>
+                <button
+                  onClick={() => setShowFareMatrix((prev) => !prev)}
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-3 py-1 rounded font-semibold text-xs sm:text-sm"
+                  type="button"
+                >
+                  {showFareMatrix ? "Hide" : "Show"}
+                </button>
               </div>
-            )}
+
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3">
+                <p className="text-sm font-semibold text-gray-800">
+                  Base Fare: ₱{baseFare}
+                </p>
+              </div>
+
+              {showFareMatrix ? (
+                fareRatesLoading ? (
+                  <p className="text-white text-sm py-6 text-center">Loading fare matrix...</p>
+                ) : sortedFareMatrix.length === 0 ? (
+                  <p className="text-white text-sm py-6 text-center">No fare rates configured yet.</p>
+                ) : (
+                  <div className="max-h-80 sm:max-h-96 overflow-y-auto">
+                    <ul className="space-y-2">
+                      {sortedFareMatrix.map(([routeName, routeFare]) => (
+                        <li
+                          key={routeName}
+                          className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200"
+                        >
+                          <span className="text-gray-900 text-sm sm:text-base">{routeName}</span>
+                          <span className="font-semibold text-gray-800 text-sm sm:text-base">₱{routeFare}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              ) : (
+                <p className="text-white text-sm py-6 text-center">Fare matrix is hidden. Click Show to view rates.</p>
+              )}
+            </div>
           </div>
         </div>
       ) : (

@@ -13,7 +13,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useDriverLocation } from "../hooks/useDriverLocation";
-import { fareMatrix } from "../utils/fareMatrix";
+import { useFareRates } from "../hooks/useFareRates";
 
 const AVERAGE_WAIT_TIME_PER_DRIVER = 5; // in minutes
 
@@ -57,6 +57,7 @@ export const useRide = () => {
 };
 
 export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { fareRates } = useFareRates();
   const [driver, setDriver] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [manualOffline, setManualOffline] = useState(false);
@@ -223,7 +224,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ) {
         const endedAt = new Date();
         const dropoffLocation = { lat: coords.latitude, lng: coords.longitude };
-        const fare = selectedDestination ? fareMatrix[selectedDestination] : 0;
+        const fare = selectedDestination ? fareRates[selectedDestination] ?? 0 : 0;
 
         // Use the currentWaitTimeMinutes state as wait time in queue stored here
         const waitTimeMinutes = currentWaitTimeMinutes;
@@ -272,6 +273,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     driver,
     currentWaitTimeMinutes,
     pickupLocation,
+    fareRates,
   ]);
 
   // Listen for real-time queue updates and maintain position and driverJoinedAt timestamp
@@ -375,6 +377,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         setDriverJoinedAt(joinedAt); // Maintain the join timestamp for wait time
         setHasJoined(true);
+        setToastMsg("You joined the queue successfully.");
+        setTimeout(() => setToastMsg(""), 3000);
 
         // If there's a pending ride log, calculate duration and log it
         if (pendingRideLog) {
